@@ -10,6 +10,9 @@ build/
 .fvm/
 doc/api/
 
+# tooling build output (compiled harness)
+tooling/build/
+
 # IDE / editor
 .idea/
 *.iml
