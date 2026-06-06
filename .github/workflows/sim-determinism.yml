@@ -17,6 +17,8 @@ jobs:
       - run: bash tooling/check_no_banned_imports.sh
       - run: dart test
         working-directory: packages/sim
+      - run: dart test packages/protocol
+      - run: dart test packages/netcode
 
   replay-golden:
     name: cross-platform replay golden (native + js + wasm)
@@ -31,4 +33,6 @@ jobs:
       - run: dart pub get
       - run: dart test packages/sim -p node
       - run: dart test packages/sim -p node -c dart2wasm
+      - run: dart test packages/netcode -p node
+      - run: dart test packages/netcode -p node -c dart2wasm
       - run: bash tooling/compare_replays.sh tooling/replay_fixtures/smoke.json
