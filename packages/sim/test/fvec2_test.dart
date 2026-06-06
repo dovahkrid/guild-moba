@@ -23,6 +23,8 @@ void main() {
 
   test('length uses Fixed.sqrt', () {
     expect(v(3, 4).length().toDouble(), closeTo(5.0, 0.01));
+    // Exact raw pin — a sub-ULP cross-runtime divergence would change this.
+    expect(v(3, 4).length().raw, 327680); // 5.0 exactly
   });
 
   test('equality is value-based', () {

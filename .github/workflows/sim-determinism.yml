@@ -29,4 +29,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - run: dart pub get
+      - run: dart test packages/sim -p node
+      - run: dart test packages/sim -p node -c dart2wasm
       - run: bash tooling/compare_replays.sh tooling/replay_fixtures/smoke.json

@@ -25,6 +25,9 @@ void main() {
   test('sqrt via integer Newton', () {
     expect((Fixed.fromInt(16).sqrt()).toDouble(), closeTo(4.0, 0.001));
     expect((Fixed.fromInt(2).sqrt()).toDouble(), closeTo(1.41421, 0.001));
+    // Exact raw pins — a sub-ULP cross-runtime divergence would change these.
+    expect(Fixed.fromInt(16).sqrt().raw, 262144); // 4.0 exactly
+    expect(Fixed.fromInt(2).sqrt().raw, 92681); // ~1.41420 in Q16.16
   });
 
   test('floorDiv floors toward negative infinity (unlike ~/)', () {
