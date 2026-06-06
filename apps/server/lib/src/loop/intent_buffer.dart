@@ -11,6 +11,7 @@ class IntentBuffer {
   bool accept(InputMsg msg) {
     final slot = msg.slot;
     if (slot < 0 || slot > 1) return false;
+    if (msg.type < 0 || msg.type >= IntentType.values.length) return false;
     if (msg.seq <= lastAckedSeq[slot]) return false;
     lastAckedSeq[slot] = msg.seq;
     _current[slot] = Intent(

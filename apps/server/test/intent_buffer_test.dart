@@ -35,4 +35,12 @@ void main() {
     // No new input next tick: still returns the held targets (heroes keep seeking).
     expect(b.drainForTick().length, 2);
   });
+
+  test('rejects out-of-range type and does not throw', () {
+    final b = IntentBuffer();
+    final badMsg = const InputMsg(
+        slot: 0, seq: 1, clientTick: 0, aimX: 0, aimY: 0, type: 99);
+    expect(b.accept(badMsg), isFalse);
+    expect(b.lastAckedSeq[0], 0); // unchanged
+  });
 }

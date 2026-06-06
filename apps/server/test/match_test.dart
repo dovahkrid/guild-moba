@@ -45,4 +45,32 @@ void main() {
       expect(match.ended, isTrue);
     });
   });
+
+  test('malformed frame is ignored and does not crash or end the match', () {
+    final driver = FakeTickDriver();
+    final p0 = FakePlayerConn(), p1 = FakePlayerConn();
+    final match = Match(seed: 42, driver: driver)
+      ..addPlayer(0, p0)
+      ..addPlayer(1, p1)
+      ..start();
+
+    // Send a malformed frame with unknown tag 255 — must not throw.
+    p0.receive([255]);
+
+    // Send a valid input after the bad frame.
+    p0.receive(ProtocolCodec.encode(const InputMsg(
+        slot: 0, seq: 1, clientTick: 0, aimX: 0, aimY: 0, type: 1)));
+
+    driver.pump(3);
+
+    // Match must still be running (not ended).
+    expect(match.ended, isFalse);
+
+    // Snapshots are still emitted — the match loop is alive.
+    final snaps = p0.sent.map(ProtocolCodec.decode).whereType<SnapshotMsg>().toList();
+    expect(snaps, isNotEmpty);
+
+    // The valid input after the bad frame was acked.
+    expect(snaps.last.ackedSeq[0], 1);
+  });
 }

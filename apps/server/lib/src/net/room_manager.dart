@@ -24,13 +24,13 @@ class RoomManager {
     _match ??= Match(seed: seed, driver: driverFactory());
     final slot = _filled++;
     _match!.addPlayer(slot, conn);
-    if (_filled == 2) _match!.start();
-    // Reset the room when this match ends so the next pair can play.
-    conn.onClose.then((_) {
-      if (_match != null && _match!.ended) {
+    if (_filled == 2) {
+      // Reset the room the moment the match ends, independent of socket close.
+      _match!.onEnded = () {
         _match = null;
         _filled = 0;
-      }
-    });
+      };
+      _match!.start();
+    }
   }
 }

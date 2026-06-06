@@ -23,12 +23,20 @@ class Match {
   bool started = false;
   bool ended = false;
 
+  /// Called synchronously when the match ends (both win/loss paths).
+  void Function()? onEnded;
+
   int get serverTick => _currentTick;
 
   void addPlayer(int slot, PlayerConn conn) {
     _players[slot] = conn;
     _subs.add(conn.messages.listen((frame) {
-      final msg = ProtocolCodec.decode(frame);
+      final Msg msg;
+      try {
+        msg = ProtocolCodec.decode(frame);
+      } catch (_) {
+        return; // malformed frame: ignore, keep the match alive
+      }
       if (msg is InputMsg) {
         // Server is authoritative on slot: stamp with the assigned slot.
         _buffer.accept(InputMsg(
@@ -40,7 +48,7 @@ class Match {
           type: msg.type,
         ));
       }
-    }));
+    }, onError: (Object _) => conn.close())); // stream/socket error: drop that conn
     conn.onClose.then((_) => _onPlayerLeft(slot));
   }
 
@@ -86,5 +94,6 @@ class Match {
     for (final sub in _subs) {
       sub.cancel();
     }
+    onEnded?.call();
   }
 }

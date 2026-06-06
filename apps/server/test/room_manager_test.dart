@@ -27,4 +27,25 @@ void main() {
     final end = ProtocolCodec.decode(p2.sent.single) as MatchEndMsg;
     expect(end.reason, EndReason.roomFull);
   });
+
+  test('room resets on match end so a fresh pair can start', () async {
+    final rm = RoomManager(seed: 7, driverFactory: () => FakeTickDriver());
+    final p0 = FakePlayerConn(), p1 = FakePlayerConn();
+    rm.connect(p0);
+    rm.connect(p1);
+    // Match is now running; close one player to end it.
+    p0.close();
+    // Wait one microtask for the onClose future to fire.
+    await Future<void>.value();
+
+    // Connect a fresh pair — the room must have reset.
+    final p2 = FakePlayerConn(), p3 = FakePlayerConn();
+    rm.connect(p2);
+    rm.connect(p3);
+
+    final m2 = ProtocolCodec.decode(p2.sent.first) as MatchStartMsg;
+    final m3 = ProtocolCodec.decode(p3.sent.first) as MatchStartMsg;
+    expect(m2.yourSlot, 0);
+    expect(m3.yourSlot, 1);
+  });
 }
