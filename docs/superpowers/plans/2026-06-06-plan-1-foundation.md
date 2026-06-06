@@ -1025,8 +1025,8 @@ class Simulation {
     final w = ByteWriter();
     w.i32(kSchemaVersion);
     w.i32(tick);
-    w.i32(_rng.stateLo);
-    w.i32(_rng.stateHi);
+    w.u32(_rng.stateLo); // RNG limbs are unsigned 32-bit; use u32 (see ByteWriter)
+    w.u32(_rng.stateHi);
 
     final ids = entityIdsSorted;
     w.i32(ids.length);
