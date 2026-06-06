@@ -38,4 +38,18 @@ void main() {
     final b = Simulation.create(const SimConfig(seed: 1337));
     expect(a.canonicalStateHash() == b.canonicalStateHash(), isFalse);
   });
+
+  // Pinned regression: the 300-tick canonical state hash must never change
+  // unless the sim physics or encoding are deliberately updated. Guards against
+  // accidental cross-runtime non-determinism at the unit level (complements the
+  // cross-platform golden in tooling/replay_fixtures/smoke.golden).
+  test('pinned 300-tick canonical state hash', () {
+    final s = Simulation.create(const SimConfig(seed: 1337));
+    const m0 = Intent(playerSlot: 0, type: IntentType.move, aimX: 655360, aimY: 131072, seq: 1);
+    const m1 = Intent(playerSlot: 1, type: IntentType.move, aimX: -655360, aimY: 131072, seq: 1);
+    for (var t = 0; t < 300; t++) {
+      s.step(t, [m0, m1]);
+    }
+    expect(s.canonicalStateHash(), 0xa00d6337);
+  });
 }

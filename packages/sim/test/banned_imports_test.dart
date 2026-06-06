@@ -20,9 +20,32 @@ final _bannedApis = <RegExp>[
   RegExp(r'\b(DateTime|Stopwatch)\b'),
 ];
 
+/// Find the `packages/sim` root by walking up from [start] until a directory
+/// containing both a `pubspec.yaml` and a `lib/` is found.
+Directory _findPackageRoot(Directory start) {
+  var d = start;
+  for (var i = 0; i < 10; i++) {
+    if (File('${d.path}/pubspec.yaml').existsSync() &&
+        Directory('${d.path}/lib').existsSync()) {
+      return d;
+    }
+    final parent = d.parent;
+    if (parent.path == d.path) break;
+    d = parent;
+  }
+  // Fallback: look for packages/sim from cwd
+  final cwd = Directory.current;
+  final candidate = Directory('${cwd.path}/packages/sim');
+  if (candidate.existsSync()) return candidate;
+  throw StateError('Cannot find packages/sim root from ${start.path}');
+}
+
 void main() {
   test('packages/sim/lib is platform-pure and determinism-safe', () {
-    final libDir = Directory('lib');
+    // Resolve lib/ robustly: walk up from cwd until we find a dir with
+    // pubspec.yaml + lib/, which is the packages/sim root.
+    final packageRoot = _findPackageRoot(Directory.current);
+    final libDir = Directory('${packageRoot.path}/lib');
     final offenders = <String>[];
     for (final f in libDir.listSync(recursive: true).whereType<File>()) {
       if (!f.path.endsWith('.dart')) continue;
