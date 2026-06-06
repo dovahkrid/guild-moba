@@ -1,0 +1,65 @@
+import 'dart:async';
+
+import 'package:netcode/netcode.dart';
+import 'package:protocol/protocol.dart';
+
+import '../net/transport.dart';
+
+/// Glue between the network Transport and the pure MatchController. Holds NO
+/// gameplay truth — it only pumps bytes and the 30 Hz client tick.
+class MatchBinding {
+  MatchBinding(this._transport) {
+    _sub = _transport.inbound.listen(_onFrame);
+  }
+
+  final Transport _transport;
+  late final StreamSubscription<List<int>> _sub;
+
+  MatchController? _controller;
+  int _renderTimeMs = 0;
+  int _accMs = 0;
+  static const int _tickMs = 33; // ~30 Hz
+
+  bool get isReady => _controller != null;
+  MatchView? get view => _controller?.update(_renderTimeMs);
+
+  void _onFrame(List<int> frame) {
+    final msg = ProtocolCodec.decode(frame);
+    if (msg is MatchStartMsg) {
+      _controller = MatchController(
+        seed: msg.seed,
+        localSlot: msg.yourSlot,
+        startTick: msg.startTick,
+      );
+    } else if (msg is SnapshotMsg) {
+      _controller?.onServerSnapshot(msg);
+    } else if (msg is MatchEndMsg) {
+      // Slice: stop pumping; UI can show "opponent left".
+      _controller = null;
+    }
+  }
+
+  /// Local input: a world point (Q16.16 raw). Predict immediately + send.
+  void submitMoveTo(int aimXRaw, int aimYRaw) {
+    final c = _controller;
+    if (c == null) return;
+    final input = c.applyLocalInput(aimXRaw, aimYRaw);
+    _transport.send(ProtocolCodec.encode(input));
+  }
+
+  /// Advance by [dtMs] of real time: accumulate and step the predicted sim at
+  /// a fixed 30 Hz; advance the render clock for interpolation.
+  void tick(int dtMs) {
+    _renderTimeMs += dtMs;
+    _accMs += dtMs;
+    while (_accMs >= _tickMs) {
+      _accMs -= _tickMs;
+      _controller?.advanceClientTick();
+    }
+  }
+
+  Future<void> close() async {
+    await _sub.cancel();
+    await _transport.close();
+  }
+}
