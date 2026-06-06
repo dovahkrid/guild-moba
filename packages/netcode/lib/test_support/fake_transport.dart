@@ -3,7 +3,6 @@ import 'package:sim/sim.dart';
 
 import '../src/interpolation_buffer.dart';
 import '../src/match_controller.dart';
-import '../src/snapshot_cadence.dart';
 
 class _InFlight<T> {
   final int deliverAtMs;
