@@ -16,6 +16,9 @@ const int kSchemaVersion = 1;
 /// the wire format evolves.
 const int kSnapshotVersion = 1;
 
+/// Stable entity id for the wanderer NPC (created in [Simulation.create]).
+const int kWandererEntityId = 2;
+
 /// Per-tick max movement step (Q16.16). Authoring constant.
 final Fixed _kHeroStep = Fixed.fromNum(0.15);
 final Fixed _kWanderStep = Fixed.fromNum(0.05);
@@ -49,7 +52,7 @@ class Simulation {
         hp: Fixed.fromInt(100),
       ),
       Entity(
-        id: 2,
+        id: kWandererEntityId,
         kind: EntityKind.wanderer,
         teamId: 2,
         pos: FVec2.zero,
@@ -87,7 +90,7 @@ class Simulation {
 
     // The wanderer drifts by an RNG-derived direction — puts the RNG through
     // the determinism gate every tick.
-    final w = _byId[2]!;
+    final w = _byId[kWandererEntityId]!;
     final dx = _rng.nextInt(3) - 1; // -1, 0, +1
     final dy = _rng.nextInt(3) - 1;
     w.pos = FVec2(

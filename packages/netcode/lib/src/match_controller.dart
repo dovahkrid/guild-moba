@@ -112,7 +112,7 @@ class MatchController {
   /// Render view (host calls per frame). Opponent interpolated ~100ms behind.
   MatchView update(int renderTimeMs) {
     final local = _predicted.entity(localSlot).pos;
-    final wanderer = _predicted.entity(2).pos;
+    final wanderer = _predicted.entity(kWandererEntityId).pos;
     final opp = _interp.sample(renderTimeMs - 100);
     return MatchView(
       local: RenderEntity(local.x.toDouble(), local.y.toDouble()),

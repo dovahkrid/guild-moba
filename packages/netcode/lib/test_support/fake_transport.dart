@@ -1,6 +1,7 @@
 import 'package:protocol/protocol.dart';
 import 'package:sim/sim.dart';
 
+import '../src/interpolation_buffer.dart';
 import '../src/match_controller.dart';
 import '../src/snapshot_cadence.dart';
 
@@ -14,7 +15,7 @@ class _InFlight<T> {
 /// one-way latency and deterministic loss. Drives a real server Simulation
 /// against a real MatchController. dtMs=33 matches InterpolationBuffer.dtMs.
 class FakeTransport {
-  static const int dtMs = 33;
+  static const int dtMs = InterpolationBuffer.dtMs;
   final int seed;
   final int oneWayLatencyMs;
   final double lossRate; // 0..1, applied to BOTH directions
