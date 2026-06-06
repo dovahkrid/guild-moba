@@ -1,0 +1,50 @@
+import 'package:netcode/netcode.dart';
+import 'package:protocol/protocol.dart';
+import 'package:sim/sim.dart';
+import 'package:test/test.dart';
+
+MatchController _ctrl({int slot = 0}) =>
+    MatchController(seed: 1337, localSlot: slot, startTick: 0);
+
+void main() {
+  test('predicts local hero immediately (moves within a few ticks of input)', () {
+    final c = _ctrl();
+    final startX = c.debugLocalPos().x.raw;
+    c.applyLocalInput(655360, 0); // move right
+    for (var i = 0; i < 10; i++) {
+      c.advanceClientTick();
+    }
+    expect(c.debugLocalPos().x.raw, greaterThan(startX));
+  });
+
+  test('tick contract: first step is tick 0, _nextTick advances', () {
+    final c = _ctrl();
+    expect(c.predictedTick, 0); // nothing stepped yet
+    c.advanceClientTick();
+    expect(c.predictedTick, 1); // completed tick 0, next is 1
+  });
+
+  test('applyLocalInput returns an InputMsg stamped with the local slot+seq', () {
+    final c = _ctrl(slot: 1);
+    final msg = c.applyLocalInput(0, 262144);
+    expect(msg.slot, 1);
+    expect(msg.seq, 1);
+    expect(msg.type, IntentType.move.index);
+    expect(msg.aimY, 262144);
+  });
+
+  test('reconcile to a fresh snapshot with no pending leaves no correction', () {
+    // Build an authoritative sim that advanced identically with no input.
+    final server = Simulation.create(const SimConfig(seed: 1337));
+    final c = _ctrl();
+    for (var t = 0; t < 5; t++) {
+      server.step(t, const []);
+      c.advanceClientTick();
+    }
+    final snap = SnapshotMsg(
+        serverTick: 4, ackedSeq: const [0, 0], stateBytes: server.snapshotBytes());
+    c.onServerSnapshot(snap);
+    expect(c.lastCorrectionDist, 0.0); // exact at steady state, no pending
+    expect(c.debugHash(), server.canonicalStateHash());
+  });
+}
