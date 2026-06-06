@@ -1,0 +1,12 @@
+name: sim
+description: Deterministic, platform-agnostic MOBA simulation (pure Dart).
+publish_to: none
+version: 0.0.1
+
+environment:
+  sdk: ^3.6.0
+
+resolution: workspace
+
+dev_dependencies:
+  test: ^1.25.0

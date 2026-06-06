@@ -1,0 +1,14 @@
+name: guild_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+# Explicit member paths (glob `packages/*` needs SDK >= 3.11).
+workspace:
+  - packages/sim
+  - packages/protocol
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^4.0.0
