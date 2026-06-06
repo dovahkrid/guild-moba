@@ -13,7 +13,10 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with: { sdk: 3.11.5 }
       - run: dart pub get
-      - run: dart analyze --fatal-infos --fatal-warnings
+      # Scope to the Dart-only targets; apps/client is a Flutter app analyzed by
+      # the separate client-analyze job (root `dart pub get` doesn't fetch its
+      # Flutter SDK deps, so a whole-tree analyze would fail to resolve them).
+      - run: dart analyze --fatal-infos --fatal-warnings packages apps/server tooling
       - run: bash tooling/check_no_banned_imports.sh
       - run: dart test
         working-directory: packages/sim
