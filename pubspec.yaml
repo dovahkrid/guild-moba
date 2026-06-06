@@ -8,10 +8,15 @@ environment:
 workspace:
   - packages/sim
   - packages/protocol
+  - packages/netcode
 
 dependencies:
   sim:
     path: packages/sim
+  protocol:
+    path: packages/protocol
+  netcode:
+    path: packages/netcode
 
 dev_dependencies:
   test: ^1.25.0

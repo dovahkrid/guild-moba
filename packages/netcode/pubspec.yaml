@@ -1,0 +1,14 @@
+name: netcode
+description: Pure-Dart client-side prediction/reconciliation/interpolation (headless).
+publish_to: none
+version: 0.0.1
+environment:
+  sdk: ^3.6.0
+resolution: workspace
+dependencies:
+  sim:
+    path: ../sim
+  protocol:
+    path: ../protocol
+dev_dependencies:
+  test: ^1.25.0
