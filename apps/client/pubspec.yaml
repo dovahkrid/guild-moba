@@ -1,0 +1,29 @@
+name: guild_client
+description: "Flutter+Flame client for Guild — render + input only."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flame: ^1.30.0
+  web_socket_channel: ^3.0.3
+  sim:
+    path: ../../packages/sim
+  protocol:
+    path: ../../packages/protocol
+  netcode:
+    path: ../../packages/netcode
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
