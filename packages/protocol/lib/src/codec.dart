@@ -30,6 +30,7 @@ class ProtocolCodec {
         w.i32(m.aimY);
         w.i32(m.type);
       case final SnapshotMsg m:
+        assert(m.ackedSeq.length == 2, 'ackedSeq must be length 2');
         w.bytes([_tagSnapshot]);
         w.i32(m.serverTick);
         w.i32(m.ackedSeq[0]);
@@ -48,6 +49,7 @@ class ProtocolCodec {
       throw ArgumentError('protocol frames must be binary, got ${frame.runtimeType}');
     }
     final bytes = frame is Uint8List ? frame : Uint8List.fromList(frame);
+    if (bytes.isEmpty) throw ArgumentError('empty protocol frame');
     final tag = bytes[0];
     final r = ByteReader(Uint8List.sublistView(bytes, 1));
     switch (tag) {

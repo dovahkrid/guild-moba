@@ -44,6 +44,10 @@ void main() {
     expect(() => ProtocolCodec.decode('not bytes'), throwsArgumentError);
   });
 
+  test('decode throws on an empty frame', () {
+    expect(() => ProtocolCodec.decode(<int>[]), throwsArgumentError);
+  });
+
   test('InputMsg golden bytes are stable', () {
     final bytes = ProtocolCodec.encode(const InputMsg(
         slot: 0, seq: 1, clientTick: 0, aimX: 65536, aimY: 0, type: 1));
