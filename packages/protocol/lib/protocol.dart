@@ -1,2 +1,5 @@
-// Wire protocol stub. Message types land in Plan 2 (Netcode).
+/// Wire protocol for Guild netcode.
 library;
+
+export 'src/messages.dart';
+export 'src/codec.dart';
