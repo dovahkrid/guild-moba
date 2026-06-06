@@ -9,6 +9,7 @@ workspace:
   - packages/sim
   - packages/protocol
   - packages/netcode
+  - apps/server
 
 dependencies:
   sim:

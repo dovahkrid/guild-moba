@@ -1,0 +1,17 @@
+name: server
+description: Authoritative WebSocket match server for the Guild slice.
+publish_to: none
+version: 0.0.1
+environment:
+  sdk: ^3.6.0
+resolution: workspace
+dependencies:
+  sim:
+    path: ../../packages/sim
+  protocol:
+    path: ../../packages/protocol
+  shelf: ^1.4.2
+  shelf_web_socket: ^3.0.0
+  web_socket_channel: ^3.0.3
+dev_dependencies:
+  test: ^1.25.0
