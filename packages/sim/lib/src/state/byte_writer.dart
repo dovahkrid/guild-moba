@@ -29,6 +29,9 @@ class ByteWriter {
 
   void fixed(Fixed f) => i32(f.raw);
 
+  void bytes(List<int> raw) =>
+      _b.add(raw is Uint8List ? raw : Uint8List.fromList(raw));
+
   Uint8List toBytes() => _b.toBytes();
 }
 
@@ -43,6 +46,38 @@ int mul32(int a, int b) {
   final int lo = (a & 0xFFFF) * b;
   final int hi = (((a >>> 16) * b) & 0xFFFF) << 16;
   return (lo + hi) & 0xFFFFFFFF;
+}
+
+/// Mirror of ByteWriter. Uses ByteData (typed-data getters are cross-runtime
+/// deterministic, unlike Dart's `<<` which is signed-32-bit on dart2js).
+class ByteReader {
+  final ByteData _bd;
+  int _off = 0;
+  ByteReader(Uint8List bytes)
+      : _bd = ByteData.sublistView(bytes is Uint8List ? bytes : Uint8List.fromList(bytes));
+
+  int u32() {
+    final v = _bd.getUint32(_off, Endian.little);
+    _off += 4;
+    return v;
+  }
+
+  int i32() {
+    final v = _bd.getInt32(_off, Endian.little);
+    _off += 4;
+    return v;
+  }
+
+  Fixed fixed() => Fixed.raw(i32());
+
+  Uint8List bytes(int n) {
+    final out = Uint8List.sublistView(_bd, _off, _off + n);
+    _off += n;
+    return Uint8List.fromList(out);
+  }
+
+  int get offset => _off;
+  bool get atEnd => _off >= _bd.lengthInBytes;
 }
 
 /// FNV-1a/32 over a byte stream. Dependency-free and identical across runtimes
