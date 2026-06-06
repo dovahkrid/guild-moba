@@ -8,7 +8,12 @@ import 'model/intent.dart';
 import 'model/sim_config.dart';
 import 'state/byte_writer.dart';
 
+/// Version of the canonicalBytes() determinism format (the replay-golden hash).
 const int kSchemaVersion = 1;
+
+/// Version of the snapshotBytes() netcode format (superset incl. Entity.target).
+/// Independent from kSchemaVersion so the determinism golden never moves when
+/// the wire format evolves.
 const int kSnapshotVersion = 1;
 
 /// Per-tick max movement step (Q16.16). Authoring constant.
@@ -158,7 +163,13 @@ class Simulation {
   void restoreFromSnapshot(Uint8List bytes) {
     final r = ByteReader(bytes);
     final version = r.i32();
-    assert(version == kSnapshotVersion, 'snapshot version $version');
+    // A real throw (not assert) — asserts are stripped in release, and a
+    // version-mismatched snapshot from a newer server must fail loud, not
+    // silently corrupt state.
+    if (version != kSnapshotVersion) {
+      throw ArgumentError(
+          'unsupported snapshot version $version (expected $kSnapshotVersion)');
+    }
     tick = r.i32();
     final lo = r.u32();
     final hi = r.u32();
