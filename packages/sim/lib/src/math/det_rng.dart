@@ -33,8 +33,8 @@ List<int> _add64(int aLo, int aHi, int bLo, int bHi) {
 
 // PCG multiplier 6364136223846793005 = 0x5851F42D4C957F2D
 const int _mulLo = 0x4C957F2D, _mulHi = 0x5851F42D;
-// PCG increment 1442695040888963407 = 0x14057B7F82F2B65D (odd)
-const int _incLo = 0x82F2B65D, _incHi = 0x14057B7F;
+// PCG increment 1442695040888963407 = 0x14057B7EF767814F (must be odd)
+const int _incLo = 0xF767814F, _incHi = 0x14057B7E;
 
 /// PCG-XSH-RR 32-bit-output RNG. The 64-bit LCG state lives in two 32-bit limbs
 /// so no operation depends on true 64-bit ints (which dart2js lacks).

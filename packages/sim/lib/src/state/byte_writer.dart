@@ -10,12 +10,21 @@ class ByteWriter {
   final BytesBuilder _b = BytesBuilder(copy: false);
 
   void i32(int v) {
-    assert(v > -0x80000000 && v < 0x80000000, 'value $v exceeds int32 range');
+    assert(v >= -0x80000000 && v <= 0x7FFFFFFF, 'value $v exceeds int32 range');
     final int u = v & 0xFFFFFFFF; // non-negative in [0, 2^32)
     _b.addByte(u & 0xFF);
     _b.addByte((u >> 8) & 0xFF);
     _b.addByte((u >> 16) & 0xFF);
     _b.addByte((u >> 24) & 0xFF);
+  }
+
+  /// Unsigned 32-bit (e.g. RNG state limbs). Same 4 LE bytes as i32's encoding.
+  void u32(int v) {
+    assert(v >= 0 && v <= 0xFFFFFFFF, 'value $v exceeds uint32 range');
+    _b.addByte(v & 0xFF);
+    _b.addByte((v >> 8) & 0xFF);
+    _b.addByte((v >> 16) & 0xFF);
+    _b.addByte((v >> 24) & 0xFF);
   }
 
   void fixed(Fixed f) => i32(f.raw);

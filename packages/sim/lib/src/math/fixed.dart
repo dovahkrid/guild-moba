@@ -2,9 +2,11 @@
 const int kFracBits = 16;
 const int kOne = 1 << kFracBits; // 65536
 
-/// Signed floor-division. `~/` truncates toward zero and the shift operators
-/// diverge on dart2js for negatives — this is the one true floor for the sim.
-int floorDiv(int a, int d) => a >= 0 ? a ~/ d : -((-a + d - 1) ~/ d);
+/// Signed floor-division. Requires d > 0 (the only use in this package).
+int floorDiv(int a, int d) {
+  assert(d > 0, 'floorDiv requires a positive divisor');
+  return a >= 0 ? a ~/ d : -((-a + d - 1) ~/ d);
+}
 
 /// Fixed-point scalar. SAFETY CONTRACT: callers keep |value| < 32768, so
 /// |raw| < 2^31 and every intermediate below stays < 2^53 (dart2js-safe).

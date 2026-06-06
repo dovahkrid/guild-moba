@@ -33,11 +33,28 @@ void main() {
   });
 
   test('pinned regression vector (defends cross-runtime identity)', () {
-    // After implementing, run once to capture the real values, paste them here,
-    // and keep them as a regression pin. These constants are placeholders to be
-    // replaced with the first green run's output (Step 4 prints them).
+    // Pinned from first native run; guards cross-runtime identity.
     final r = DetRng.fromInt(1337);
     final got = <int>[r.nextU32(), r.nextU32(), r.nextU32()];
-    expect(got, [708451831, 3264970190, 1489975032]);
+    expect(got, [2497197284, 1507425053, 1617594380]);
+  });
+
+  test('nextFixedUnit returns raw in [0, 65535]', () {
+    final r = DetRng.fromInt(42);
+    for (var i = 0; i < 1000; i++) {
+      final v = r.nextFixedUnit();
+      expect(v.raw >= 0 && v.raw <= 65535, isTrue);
+    }
+  });
+
+  test('nextFixedUnit pinned first value equals nextU32() >>> 16', () {
+    // Pinned from first native run; guards cross-runtime identity.
+    final r1 = DetRng.fromInt(1337);
+    final fuRaw = r1.nextFixedUnit().raw;
+
+    final r2 = DetRng.fromInt(1337);
+    final u32first = r2.nextU32();
+    expect(fuRaw, u32first >>> 16); // exact extraction
+    expect(fuRaw, 38104); // pinned value
   });
 }

@@ -28,4 +28,14 @@ void main() {
   test('equality is value-based', () {
     expect(v(1, 2) == v(1, 2), isTrue);
   });
+
+  test('dot product', () {
+    expect(v(1, 0).dot(v(0, 1)).toDouble(), 0.0); // perpendicular
+    expect(v(2, 3).dot(v(4, 5)).toDouble(), closeTo(23.0, 0.001));
+  });
+
+  test('zero constant', () {
+    expect(FVec2.zero.x.toDouble(), 0.0);
+    expect(FVec2.zero.y.toDouble(), 0.0);
+  });
 }
