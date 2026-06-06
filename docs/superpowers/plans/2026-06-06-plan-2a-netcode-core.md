@@ -17,7 +17,7 @@
 - A server `SnapshotMsg.serverTick` equals the `N` that produced it.
 - **Reconcile:** restore predicted sim to `serverTick` (so `_predicted.tick == serverTick`), then re-step `t = serverTick+1 .. _nextTick-1`, applying the local held intent in effect at each `t`.
 - **Snapshot cadence: 20 Hz via the predicate `(tick % 3) < 2`** — this exact predicate lives in shared code and is used by *both* the server (Plan 2b) and `FakeTransport`, so the harness exercises what production emits.
-- **Correction is BOUNDED, not zero.** Because the server applies a click ~2 ticks after the client predicted it, during travel the local hero leads truth by a *constant* ~0.30 world units (2 × 0.15 hero step). It collapses to **exactly 0 at steady state**. Tests assert: steady-state correction `== 0` (the determinism proof); in-motion correction stays `< 0.5` and does not grow. **Never assert `== 0` in motion.**
+- **Correction is BOUNDED, not zero.** Because the server applies a click ~2 ticks after the client predicted it, during travel the local hero leads truth by a bounded amount (≈ unacked-in-flight ticks × the per-tick step, well under 0.5 world units at 150 ms), collapsing to **exactly 0 at steady state**. Tests assert: steady-state correction `== 0` (the determinism proof); in-motion correction stays `< 0.5` and does not grow. **Never assert `== 0` in motion.**
 - **Frames are binary only.** Anything that decodes a frame throws on a `String` (never silently `codeUnits`-convert).
 
 ---

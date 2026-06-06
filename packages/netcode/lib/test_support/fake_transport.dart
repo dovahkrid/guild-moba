@@ -32,6 +32,12 @@ class FakeTransport {
   final List<Intent?> _serverHeld = [null, null];
   final List<int> _ackedSeq = [0, 0];
 
+  /// The exact merged authoritative intents the server stepped at each tick,
+  /// indexed by tick number. Enables genuine independent replay in tests.
+  final List<List<Intent>> serverInputLog = [];
+
+  int _oppSeq = 0;
+
   FakeTransport({
     required this.seed,
     required this.client,
@@ -48,6 +54,17 @@ class FakeTransport {
   void clientSend(InputMsg msg) {
     if (_drop()) return;
     _toServer.add(_InFlight(_nowMs + oneWayLatencyMs, msg));
+  }
+
+  /// Opponent (the OTHER slot, not the local client) sends an input now
+  /// (subject to the same latency + loss). Enables tests to drive the opponent
+  /// in a straight line and assert real interpolation on a moving segment.
+  void opponentSend(int aimX, int aimY) {
+    if (_drop()) return;
+    _oppSeq++;
+    final slot = 1 - localSlot;
+    _toServer.add(_InFlight(_nowMs + oneWayLatencyMs,
+        InputMsg(slot: slot, seq: _oppSeq, clientTick: 0, aimX: aimX, aimY: aimY, type: IntentType.move.index)));
   }
 
   /// Advance the whole world by one 33ms client frame: deliver due packets,
@@ -96,6 +113,8 @@ class FakeTransport {
       ];
       final tick = _serverNextTick;
       server.step(tick, intents);
+      // Record the merged authoritative input list for independent replay.
+      serverInputLog.add(List.of(intents));
       if (shouldSnapshot(tick) && !_drop()) {
         _toClient.add(_InFlight(
           _nowMs + oneWayLatencyMs,

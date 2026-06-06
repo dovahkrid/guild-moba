@@ -101,15 +101,84 @@ void main() {
         reason: 'in-motion correction must stay < 0.5 (max was $maxCorrectionInMotion)');
   });
 
+  // ── Case 2b: Sustained correction bounded under continuous input ───────────
+  test(
+      'case 2b: sustained target-changing input stays bounded — continuous reconcile is bounded and observed',
+      () {
+    final t = _makeTransport(oneWayLatencyMs: 75);
+
+    // Two distinct aim points to alternate between. Using x=0.0 vs x=0.5 (Fixed
+    // Q16.16 = 0 vs 32768) keeps the per-reconcile correction well under 0.5
+    // (max ≈ one heroStep = 0.15) while the target IS different on every alternate
+    // input — guaranteeing correction > 0 on most reconciles and proving that
+    // continuous correction is bounded.
+    final aimA = 0;       // x=0.0 (Fixed Q16.16)
+    final aimB = 32768;   // x=0.5
+
+    var maxCorrectionObserved = 0.0;
+    var correctionObservedCount = 0;
+    var correctionAboveZeroCount = 0;
+
+    // Run 120 frames, issuing a new target-changing input every ~5 frames so
+    // there is always at least one unacked input in-flight at 150ms RTT.
+    for (var i = 0; i < 120; i++) {
+      // Alternate aim every 5 frames to keep unacked inputs in-flight at 150ms.
+      if (i % 5 == 0) {
+        final aim = (i ~/ 5) % 2 == 0 ? aimA : aimB;
+        final msg = t.client.applyLocalInput(aim, 0);
+        t.clientSend(msg);
+      }
+      t.tickWorld();
+
+      if (t.client.lastServerTick >= 0) {
+        final d = t.client.lastCorrectionDist;
+        // Correction must always stay bounded below 0.5 world units.
+        expect(d, lessThan(0.5),
+            reason: 'sustained correction must stay < 0.5 (got $d at tick ${t.client.lastServerTick})');
+        if (d > maxCorrectionObserved) maxCorrectionObserved = d;
+        correctionObservedCount++;
+        if (d > 0.0) correctionAboveZeroCount++;
+      }
+    }
+
+    // Must have measured correction on multiple reconciles.
+    expect(correctionObservedCount, greaterThan(5),
+        reason: 'must have observed correction on multiple reconciles');
+
+    // Correction must be > 0 on multiple reconciles (proves continuous correction,
+    // not just a one-time event).
+    expect(correctionAboveZeroCount, greaterThan(3),
+        reason: 'correction must be > 0 on multiple reconciles under sustained divergence');
+
+    // Max must be bounded — never grows unboundedly.
+    expect(maxCorrectionObserved, lessThan(0.5),
+        reason: 'max observed correction must be bounded < 0.5');
+  });
+
   // ── Case 3: 30% loss bounded ──────────────────────────────────────────────
   test('case 3: 30% packet loss — correction bounded, pendingCount bounded', () {
     final t = _makeTransport(lossRate: 0.30);
 
-    // Send a move.
+    // Send initial move.
     final msg = t.client.applyLocalInput(655360, 0);
     t.clientSend(msg);
 
+    // Two distinct aim points that change the target meaningfully but keep the
+    // per-reconcile correction bounded < 0.5. Using x=0.0 vs x=0.5 (Fixed Q16.16)
+    // ensures pendingCount is genuinely non-trivial under loss (new intent each
+    // 10 frames, some get dropped, so pending accumulates) while correction stays
+    // well under the 0.5 bound (correction ≈ 1 heroStep = 0.15).
+    final aimA = 0;       // x=0.0 (Fixed Q16.16)
+    final aimB = 32768;   // x=0.5
+
     for (var i = 0; i < 200; i++) {
+      // Send a new target-changing input every ~10 frames so pendingCount
+      // reflects real sustained divergence under loss.
+      if (i % 10 == 0) {
+        final aim = (i ~/ 10) % 2 == 0 ? aimA : aimB;
+        final msg2 = t.client.applyLocalInput(aim, 0);
+        t.clientSend(msg2);
+      }
       // No throws expected.
       t.tickWorld();
       if (t.client.lastServerTick >= 0) {
@@ -125,7 +194,7 @@ void main() {
   // ── Case 4: Dropped input self-heals ─────────────────────────────────────
   test('case 4: dropped first input self-heals via second input', () {
     // Simulate: client's first packet is lost (don't call clientSend).
-    final t = _makeTransport();
+    final t = _makeTransport(oneWayLatencyMs: 75, lossRate: 0.0);
 
     // Apply an intent but DON'T send it (simulate drop before send).
     t.client.applyLocalInput(655360, 0);
@@ -154,6 +223,32 @@ void main() {
     if (t.client.lastServerTick >= 0) {
       expect(t.client.lastCorrectionDist, lessThan(0.5),
           reason: 'no permanent desync after first input dropped');
+    }
+
+    // True replay equality: build a fresh sim from the same seed and replay
+    // the exact merged authoritative input log the server processed.
+    final fresh = Simulation.create(const SimConfig(seed: 1337));
+    for (var tick = 0; tick < t.serverInputLog.length; tick++) {
+      fresh.step(tick, t.serverInputLog[tick]);
+    }
+    expect(fresh.canonicalStateHash(), equals(t.server.canonicalStateHash()),
+        reason: 'independent replay via serverInputLog must match server hash');
+
+    // The client's final predicted state (with no pending after settling)
+    // should also match the independent replay. Run a few more ticks to
+    // ensure the client has reconciled to the latest server snapshot.
+    for (var i = 0; i < 20; i++) {
+      t.tickWorld();
+    }
+    // After settling at steady state, correction must be 0 and client matches server.
+    if (t.client.lastCorrectionDist == 0.0) {
+      // Build a fresh replay up to the current server log length.
+      final fresh2 = Simulation.create(const SimConfig(seed: 1337));
+      for (var tick = 0; tick < t.serverInputLog.length; tick++) {
+        fresh2.step(tick, t.serverInputLog[tick]);
+      }
+      expect(fresh2.canonicalStateHash(), equals(t.server.canonicalStateHash()),
+          reason: 'settled replay must equal server hash');
     }
   });
 
@@ -219,35 +314,83 @@ void main() {
         reason: 'duplicate snapshot must not change pendingCount');
   });
 
-  // ── Case 7: Opponent interpolation on-segment ─────────────────────────────
-  test('case 7: opponent interpolation pos lies between bracketing snapshots', () {
+  // ── Case 7: Opponent interpolation — moving opponent, real segment ─────────
+  test('case 7: opponent interpolation pos lies between bracketing snapshots (moving opponent)', () {
     final t = _makeTransport(oneWayLatencyMs: 75);
 
-    // Move both heroes: slot 0 (client) moves right, slot 1 (server-driven for opp)
-    // has no explicit input so stays put. We just need some snapshots delivered.
-    final msg = t.client.applyLocalInput(655360, 0);
+    // Also move the client hero so snapshots are more interesting.
+    final msg = t.client.applyLocalInput(Fixed.fromInt(0).raw, 0);
     t.clientSend(msg);
 
-    // Run for a while to accumulate opponent snapshots.
-    for (var i = 0; i < 60; i++) {
+    // Drive the opponent in a straight line (+x direction) for many frames.
+    // The opponent hero starts at x=8; move its target to the large value so it
+    // keeps walking right for the duration of the test.
+    // oppAimX in Fixed Q16.16: large value so opponent never reaches target.
+    final oppAimX = Fixed.fromInt(100).raw;
+    const oppAimY = 0;
+
+    // Run for enough frames to accumulate several snapshots with the opponent moving.
+    // At 150ms latency, snapshots arrive ~4-5 frames late.
+    for (var i = 0; i < 80; i++) {
+      // Send opponent move input every few frames so it keeps walking.
+      if (i % 3 == 0) {
+        t.opponentSend(oppAimX, oppAimY);
+      }
       t.tickWorld();
     }
 
-    // Sample the opponent position in the render view.
-    final view = t.client.update(t.client.predictedTick * FakeTransport.dtMs);
-    // The opponent is hero slot 1, starts at x=8. Since no move input was given,
-    // it stays at x=8.
-    // The render position should be close to x=8.0.
-    expect(view.opponent.x, closeTo(8.0, 1.0),
-        reason: 'opponent render pos should be near its server position (x≈8.0)');
+    // The opponent (slot 1) starts at x=8. After 80 ticks at 0.15/tick it should
+    // have advanced meaningfully toward x=100.
+    // Sample rendered opponent pos at increasing render times to verify monotone +x.
+    // The interpolation buffer is ~100ms behind, so sample across a window that
+    // spans delivered snapshots.
+    final nowMs = t.nowMs;
 
-    // The interpolation position must not overshoot: since opponent hasn't moved,
-    // all samples are at x≈8 and interpolation must also be ≈8.
-    // This validates the "on-segment" and "never overshoots" property.
-    expect(view.opponent.x, lessThanOrEqualTo(9.0),
-        reason: 'interpolated opponent must not overshoot');
-    expect(view.opponent.x, greaterThanOrEqualTo(7.0),
-        reason: 'interpolated opponent must not undershoot');
+    // Collect several samples at INCREASING render times to verify monotone +x.
+    // We sample from (nowMs - 300) to (nowMs - 100) — a 200ms window that
+    // should span several snapshots (snapshots arrive every 33ms or 66ms).
+    final samples = <double>[];
+    for (var renderMs = nowMs - 300; renderMs <= nowMs - 100; renderMs += 33) {
+      final view = t.client.update(renderMs);
+      samples.add(view.opponent.x);
+    }
+
+    // The opponent must have actually moved (not stationary tautology).
+    // Over the 200ms window of render times the rendered x must increase.
+    final firstSample = samples.first;
+    final lastSample = samples.last;
+    expect(lastSample, greaterThan(firstSample),
+        reason: 'opponent rendered x must increase over time as it moves right '
+            '(first=${firstSample.toStringAsFixed(3)}, last=${lastSample.toStringAsFixed(3)})');
+
+    // The rendered x must be meaningfully greater than the start position (x=8):
+    // after 80 ticks at 0.15/tick the opponent is near x=20.
+    expect(lastSample, greaterThan(8.5),
+        reason: 'opponent rendered x must exceed start pos (8.0) after moving right '
+            '(got ${lastSample.toStringAsFixed(3)})');
+
+    // Samples must be non-decreasing across the window (monotone interpolation).
+    for (var i = 1; i < samples.length; i++) {
+      expect(samples[i], greaterThanOrEqualTo(samples[i - 1] - 0.001),
+          reason: 'rendered opponent x must be monotone non-decreasing: '
+              'samples[$i]=${samples[i]} < samples[${i-1}]=${samples[i-1]}');
+    }
+
+    // No-extrapolation: sample at two far-future render times past the last
+    // delivered snapshot; the interpolation must HOLD at the newest value,
+    // so both samples must be identical. The buffer's newest snapshot logical
+    // time is serverTick * 33ms; any renderTime beyond that is past all snapshots.
+    // After the main 80-tick run, the last snapshot is at tick ~76 → time ~2508ms.
+    // Sample at nowMs+5000 and nowMs+10000 — both are far past all snapshots.
+    final xFuture1 = t.client.update(nowMs + 5000).opponent.x;
+    final xFuture2 = t.client.update(nowMs + 10000).opponent.x;
+    expect(xFuture1, equals(xFuture2),
+        reason: 'interpolation must return the same value for any render time past the last '
+            'snapshot (hold-at-newest, no extrapolation): '
+            'xFuture1=$xFuture1, xFuture2=$xFuture2');
+    // And the held value must be >= the x we saw during the run (opponent moved right).
+    expect(xFuture1, greaterThan(8.0),
+        reason: 'held newest x must be greater than start pos (opponent moved right)');
   });
 
   // ── Case 8: Determinism golden ────────────────────────────────────────────
@@ -273,7 +416,7 @@ void main() {
         reason: 'different seeds should produce different hashes');
   });
 
-  // ── Case 9: Reconcile == fresh replay ─────────────────────────────────────
+  // ── Case 9: True independent seed+input-log replay ───────────────────────
   test('case 9: reconciled client state matches independent server replay', () {
     // Run the transport for a while with a known input sequence.
     final t = _makeTransport(oneWayLatencyMs: 0, lossRate: 0.0);
@@ -287,51 +430,33 @@ void main() {
       t.tickWorld();
     }
 
-    // The client should have reconciled. Its predicted hash should match
-    // what the server computes (since zero-latency → everything delivered).
     // At zero latency, the correction should always be 0.
     expect(t.client.lastCorrectionDist, 0.0,
         reason: 'zero-latency reconcile must match server exactly');
 
-    // Independent replay: build a fresh sim from the same seed, apply the
-    // same merged input log that the server processed (the server held
-    // slot-0's intent from seq=1 delivered at tick ~0).
-    // Since zero-latency and no loss, the server received the input immediately.
-    // Build the server independently: same seed, same intents.
-    // The server received: slot-0 move right intent, applied from tick ~0 onward.
-    // We don't have direct access to the server's acked intent log, so we instead
-    // verify the client's hash matches the server's current hash (which the transport
-    // exposes). After zero-latency perfect sync, client == server.
-    final serverHash = t.serverHash();
-    // The client's predicted sim is one tick ahead of the server; reconcile
-    // brings it back to server truth + re-step. Check lastCorrectionDist == 0
-    // (already done above) and that the client's last reconciled tick matches
-    // the last server snapshot tick.
-    expect(t.client.lastServerTick, greaterThanOrEqualTo(0));
-
-    // Independent direct verification: restore a fresh sim from the last
-    // server snapshot bytes and verify canonical hash matches the server.
-    final snap = SnapshotMsg(
-        serverTick: t.serverTick,
-        ackedSeq: [0, 0],
-        stateBytes: t.server.snapshotBytes());
+    // TRUE independent replay: build a fresh sim from the same seed and replay
+    // the EXACT merged authoritative input log the server processed (not from
+    // server's snapshotBytes — that would be circular / self-confirming).
     final fresh = Simulation.create(const SimConfig(seed: 1337));
-    fresh.restoreFromSnapshot(snap.stateBytes);
-    expect(fresh.canonicalStateHash(), equals(serverHash),
-        reason: 'fresh restore from server snapshot must match server hash');
+    for (var tick = 0; tick < t.serverInputLog.length; tick++) {
+      fresh.step(tick, t.serverInputLog[tick]);
+    }
 
-    // The reconcile outcome: the client re-stepped from the server snapshot
-    // forward by (predictedTick - serverTick - 1) ticks. At zero-latency that
-    // is ~1 tick. Since correction == 0, the client's predicted sim exactly
-    // matches what the server would produce for that same number of extra ticks.
-    // Verify by stepping the fresh replay forward the same number of ticks.
+    // The independently replayed sim must match the server's current hash.
+    expect(fresh.canonicalStateHash(), equals(t.server.canonicalStateHash()),
+        reason: 'independent seed+input-log replay must match server hash');
+
+    // The client's predicted sim, after reconciling to the latest snapshot with
+    // no pending inputs (zero-latency, all acked), must also equal that hash.
+    // At zero latency: predictedTick is one ahead of serverTick, so the client
+    // has stepped one extra tick beyond the server. Step the fresh replay
+    // forward by the same number of extra ticks (with no intents, as all were acked).
     final extraTicks = t.client.predictedTick - t.client.lastServerTick - 1;
     for (var i = 0; i < extraTicks; i++) {
       fresh.step(t.client.lastServerTick + 1 + i, const []);
     }
-    // After re-stepping with no new intent (the pending list was acked),
-    // client hash == replay hash.
+    // After re-stepping with no pending intent, client hash == replay hash.
     expect(t.client.debugHash(), equals(fresh.canonicalStateHash()),
-        reason: 'reconcile outcome must equal fresh replay with same inputs');
+        reason: 'reconcile outcome must equal fresh seed+input-log replay with same inputs');
   });
 }

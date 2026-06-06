@@ -93,6 +93,10 @@ class MatchController {
     _pending.removeWhere((p) => p.intent.seq <= acked);
 
     // Restore to authoritative state, then re-step to "now".
+    // Note: acked-and-pruned intents are correctly reproduced here because the
+    // authoritative target is carried in snapshotBytes()/restoreFromSnapshot();
+    // if a future entity gains intent-derived state NOT stored in the snapshot,
+    // this re-step loop would need that state too.
     _predicted.restoreFromSnapshot(snap.stateBytes);
     for (var t = snap.serverTick + 1; t < _nextTick; t++) {
       final held = _heldAt(t);
