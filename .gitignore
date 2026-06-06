@@ -1,0 +1,22 @@
+# Superpowers brainstorm scratch (visual-companion mockups, server state)
+.superpowers/
+
+# Dart / Flutter build + tooling
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.fvm/
+doc/api/
+
+# IDE / editor
+.idea/
+*.iml
+*.iws
+.vscode/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
