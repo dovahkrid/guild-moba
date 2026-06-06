@@ -9,6 +9,7 @@ import 'model/sim_config.dart';
 import 'state/byte_writer.dart';
 
 const int kSchemaVersion = 1;
+const int kSnapshotVersion = 1;
 
 /// Per-tick max movement step (Q16.16). Authoring constant.
 final Fixed _kHeroStep = Fixed.fromNum(0.15);
@@ -19,7 +20,7 @@ final Fixed _kWanderStep = Fixed.fromNum(0.05);
 /// determinism end-to-end.
 class Simulation {
   int tick = 0;
-  final DetRng _rng;
+  DetRng _rng;
   final List<Entity> _entities;
   final Map<int, Entity> _byId;
 
@@ -122,4 +123,78 @@ class Simulation {
   }
 
   int canonicalStateHash() => (FnvHasher()..addBytes(canonicalBytes())).hash;
+
+  /// Netcode wire + restore format. Superset of canonicalBytes() that also
+  /// carries Entity.target so reconciliation can resume authoritative seeking
+  /// (esp. the opponent's target, which the client cannot re-derive). Distinct
+  /// from canonicalBytes() so the Plan-1 determinism golden stays fixed.
+  Uint8List snapshotBytes() {
+    final w = ByteWriter();
+    w.i32(kSnapshotVersion);
+    w.i32(tick);
+    w.u32(_rng.stateLo);
+    w.u32(_rng.stateHi);
+    final ids = entityIdsSorted;
+    w.i32(ids.length);
+    for (final id in ids) {
+      final e = _byId[id]!;
+      w.i32(id);
+      w.i32(e.kind.index);
+      w.i32(e.teamId);
+      w.fixed(e.pos.x);
+      w.fixed(e.pos.y);
+      w.fixed(e.vel.x);
+      w.fixed(e.vel.y);
+      w.fixed(e.hp);
+      w.fixed(e.target.x);
+      w.fixed(e.target.y);
+    }
+    return w.toBytes();
+  }
+
+  /// Overwrite this sim's entire state from snapshotBytes(). Reuses the existing
+  /// Entity instances (ids are stable from create()). FVec2 is immutable, so we
+  /// reassign Entity.pos/vel/target (all mutable fields).
+  void restoreFromSnapshot(Uint8List bytes) {
+    final r = ByteReader(bytes);
+    final version = r.i32();
+    assert(version == kSnapshotVersion, 'snapshot version $version');
+    tick = r.i32();
+    final lo = r.u32();
+    final hi = r.u32();
+    _rng = DetRng.fromState(lo, hi);
+    final count = r.i32();
+    for (var i = 0; i < count; i++) {
+      final id = r.i32();
+      r.i32(); // kind.index (stable; advance cursor)
+      r.i32(); // teamId (stable)
+      final e = _byId[id]!;
+      e.pos = FVec2(r.fixed(), r.fixed());
+      e.vel = FVec2(r.fixed(), r.fixed());
+      e.hp = r.fixed();
+      e.target = FVec2(r.fixed(), r.fixed());
+    }
+  }
+
+  /// Decode just one entity's pos from snapshotBytes() (for the interpolation
+  /// buffer) without allocating a Simulation.
+  static FVec2 peekEntityPos(Uint8List bytes, int id) {
+    final r = ByteReader(bytes);
+    r.i32(); // version
+    r.i32(); // tick
+    r.u32(); // rng lo
+    r.u32(); // rng hi
+    final count = r.i32();
+    for (var i = 0; i < count; i++) {
+      final eid = r.i32();
+      r.i32(); // kind
+      r.i32(); // team
+      final pos = FVec2(r.fixed(), r.fixed());
+      r.fixed(); r.fixed(); // vel
+      r.fixed(); // hp
+      r.fixed(); r.fixed(); // target
+      if (eid == id) return pos;
+    }
+    throw ArgumentError('entity $id not in snapshot');
+  }
 }

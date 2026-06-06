@@ -53,8 +53,7 @@ int mul32(int a, int b) {
 class ByteReader {
   final ByteData _bd;
   int _off = 0;
-  ByteReader(Uint8List bytes)
-      : _bd = ByteData.sublistView(bytes is Uint8List ? bytes : Uint8List.fromList(bytes));
+  ByteReader(Uint8List bytes) : _bd = ByteData.sublistView(bytes);
 
   int u32() {
     final v = _bd.getUint32(_off, Endian.little);
