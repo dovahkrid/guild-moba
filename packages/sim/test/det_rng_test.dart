@@ -57,4 +57,15 @@ void main() {
     expect(fuRaw, u32first >>> 16); // exact extraction
     expect(fuRaw, 38104); // pinned value
   });
+
+  test('fromState restores raw limbs verbatim (resumes identical sequence)', () {
+    final a = DetRng.fromInt(1337);
+    a.nextU32();
+    a.nextU32();
+    final lo = a.stateLo, hi = a.stateHi;
+    final tail = [a.nextU32(), a.nextU32(), a.nextU32()];
+
+    final restored = DetRng.fromState(lo, hi);
+    expect([restored.nextU32(), restored.nextU32(), restored.nextU32()], tail);
+  });
 }

@@ -56,6 +56,13 @@ class DetRng {
     return DetRng.fromLimbs(_u32(seed), seed ~/ 4294967296);
   }
 
+  /// Restore raw internal state verbatim — NO _step(), NO seed mixing.
+  /// (fromLimbs/fromInt advance + mix and so cannot resume an exact state.)
+  /// Required for exact reconciliation re-stepping (the wanderer is RNG-driven).
+  DetRng.fromState(int lo, int hi)
+      : _sLo = lo,
+        _sHi = hi;
+
   int get stateLo => _sLo;
   int get stateHi => _sHi;
 
