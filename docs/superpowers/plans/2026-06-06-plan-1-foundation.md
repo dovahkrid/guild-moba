@@ -222,9 +222,11 @@ Expected: FAIL — `Error: Couldn't resolve the package 'sim'` is gone (Task 0 f
 const int kFracBits = 16;
 const int kOne = 1 << kFracBits; // 65536
 
-/// Signed floor-division. `~/` truncates toward zero and the shift operators
-/// diverge on dart2js for negatives — this is the one true floor for the sim.
-int floorDiv(int a, int d) => a >= 0 ? a ~/ d : -((-a + d - 1) ~/ d);
+/// Signed floor-division. Requires d > 0 (the only use in this package).
+int floorDiv(int a, int d) {
+  assert(d > 0, 'floorDiv requires a positive divisor');
+  return a >= 0 ? a ~/ d : -((-a + d - 1) ~/ d);
+}
 
 /// Fixed-point scalar. SAFETY CONTRACT: callers keep |value| < 32768, so
 /// |raw| < 2^31 and every intermediate below stays < 2^53 (dart2js-safe).
@@ -513,8 +515,8 @@ List<int> _add64(int aLo, int aHi, int bLo, int bHi) {
 
 // PCG multiplier 6364136223846793005 = 0x5851F42D4C957F2D
 const int _mulLo = 0x4C957F2D, _mulHi = 0x5851F42D;
-// PCG increment 1442695040888963407 = 0x14057B7F82F2B65D (odd)
-const int _incLo = 0x82F2B65D, _incHi = 0x14057B7F;
+// PCG increment 1442695040888963407 = 0x14057B7EF767814F (odd)
+const int _incLo = 0xF767814F, _incHi = 0x14057B7E;
 
 /// PCG-XSH-RR 32-bit-output RNG. The 64-bit LCG state lives in two 32-bit limbs
 /// so no operation depends on true 64-bit ints (which dart2js lacks).
