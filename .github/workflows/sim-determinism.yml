@@ -1,0 +1,32 @@
+name: sim-determinism
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  purity-gate:
+    name: packages/sim purity + determinism-safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with: { sdk: 3.11.5 }
+      - run: dart pub get
+      - run: dart analyze --fatal-infos --fatal-warnings
+      - run: bash tooling/check_no_banned_imports.sh
+      - run: dart test
+        working-directory: packages/sim
+
+  replay-golden:
+    name: cross-platform replay golden (native + js + wasm)
+    runs-on: ubuntu-latest
+    needs: purity-gate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with: { sdk: 3.11.5 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: dart pub get
+      - run: bash tooling/compare_replays.sh tooling/replay_fixtures/smoke.json
