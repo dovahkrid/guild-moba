@@ -19,6 +19,7 @@ jobs:
         working-directory: packages/sim
       - run: dart test packages/protocol
       - run: dart test packages/netcode
+      - run: dart test apps/server
 
   replay-golden:
     name: cross-platform replay golden (native + js + wasm)
@@ -36,3 +37,17 @@ jobs:
       - run: dart test packages/netcode -p node
       - run: dart test packages/netcode -p node -c dart2wasm
       - run: bash tooling/compare_replays.sh tooling/replay_fixtures/smoke.json
+
+  client-analyze:
+    name: flutter client analyze + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: 3.41.9, channel: stable }
+      - run: flutter pub get
+        working-directory: apps/client
+      - run: flutter analyze
+        working-directory: apps/client
+      - run: flutter test
+        working-directory: apps/client
