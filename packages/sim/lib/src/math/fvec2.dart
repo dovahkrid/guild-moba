@@ -16,7 +16,7 @@ class FVec2 {
   Fixed length() => lengthSq().sqrt();
 
   @override
-  bool operator ==(Object o) => o is FVec2 && o.x == x && o.y == y;
+  bool operator ==(Object other) => other is FVec2 && other.x == x && other.y == y;
   @override
   int get hashCode => x.raw * 31 + y.raw;
   @override

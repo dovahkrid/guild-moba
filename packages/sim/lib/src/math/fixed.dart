@@ -72,7 +72,7 @@ class Fixed {
   bool operator >=(Fixed o) => raw >= o.raw;
 
   @override
-  bool operator ==(Object o) => o is Fixed && o.raw == raw;
+  bool operator ==(Object other) => other is Fixed && other.raw == raw;
   @override
   int get hashCode => raw; // value-based; NEVER branch on this in sim logic
 
