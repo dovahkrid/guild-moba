@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-enum EndReason { opponentLeft, roomFull, serverShutdown }
+enum EndReason { opponentLeft, roomFull, serverShutdown, coreDestroyed }
 
 /// Wire messages. Integer-only fields (Q16.16 raws for aim). Sealed so the
 /// codec switch is exhaustive.
@@ -44,5 +44,6 @@ class SnapshotMsg extends Msg {
 
 class MatchEndMsg extends Msg {
   final EndReason reason;
-  const MatchEndMsg({required this.reason});
+  final int winnerSlot; // -1 when not applicable (e.g. opponentLeft)
+  const MatchEndMsg({required this.reason, this.winnerSlot = -1});
 }

@@ -40,6 +40,17 @@ void main() {
     expect(m.reason, EndReason.opponentLeft);
   });
 
+  test('MatchEndMsg round-trips reason + winnerSlot', () {
+    final m = roundTrip(const MatchEndMsg(reason: EndReason.coreDestroyed, winnerSlot: 1));
+    expect(m.reason, EndReason.coreDestroyed);
+    expect(m.winnerSlot, 1);
+  });
+
+  test('MatchEndMsg winnerSlot defaults to -1', () {
+    final m = roundTrip(const MatchEndMsg(reason: EndReason.opponentLeft));
+    expect(m.winnerSlot, -1);
+  });
+
   test('decode throws on a text frame', () {
     expect(() => ProtocolCodec.decode('not bytes'), throwsArgumentError);
   });

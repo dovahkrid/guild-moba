@@ -287,6 +287,11 @@ class Simulation {
         final isInner = _isInnerTower(e.id);
         _creditGold(killerId, isInner ? kInnerTowerGold : kOuterTowerGold);
         events.add(TowerDestroyed(towerId: e.id, teamId: e.teamId, killerId: killerId));
+      } else {
+        // core
+        final winner = e.teamId == 0 ? 1 : 0;
+        if (_winnerTeam == -1) _winnerTeam = winner;
+        events.add(CoreDestroyed(teamId: e.teamId, winnerTeam: winner));
       }
       _removeEntity(e.id);
     }

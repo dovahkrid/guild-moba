@@ -277,4 +277,30 @@ void main() {
     expect(sim.entityIdsSorted.contains(kCreepIdBase), isFalse); // died to real DPS
     expect(sim.entity(0).gold, kCreepGold); // 60hp / 8dmg = 8 hits, credited once
   });
+
+  test('destroying a vulnerable enemy core sets winnerTeam and emits CoreDestroyed', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    // Remove team1 towers (zero hp -> swept) so the core is exposed.
+    sim.entity(kOuterTower1Id).hp = Fixed.zero;
+    sim.entity(kInnerTower1Id).hp = Fixed.zero;
+    sim.entity(kCore1Id).hp = Fixed.fromInt(5);
+    // Hero 0 stands next to team1 core (+14,0); keep opponent far.
+    sim.entity(0).pos = FVec2(Fixed.fromInt(13), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    sim.entity(1).pos = FVec2(Fixed.fromInt(-40), Fixed.zero);
+    sim.entity(1).target = sim.entity(1).pos;
+    expect(sim.winnerTeam, -1);
+    // Hero 0 right-clicks (locks) the core. The hp-0 towers are swept on tick 0;
+    // the lock re-applies each tick and the core dies once it becomes vulnerable.
+    const lockCore = Intent(playerSlot: 0, type: IntentType.attack, aimX: kCore1Id, seq: 1);
+    SimEvent? core;
+    for (var t = 0; t < 5 && sim.winnerTeam == -1; t++) {
+      for (final e in sim.step(t, const [lockCore])) {
+        if (e is CoreDestroyed) core = e;
+      }
+    }
+    expect(sim.winnerTeam, 0); // team 0 destroyed team 1's core
+    expect((core! as CoreDestroyed).teamId, 1);
+    expect(sim.entityIdsSorted.contains(kCore1Id), isFalse);
+  });
 }

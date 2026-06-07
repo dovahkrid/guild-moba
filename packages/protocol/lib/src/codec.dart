@@ -40,6 +40,7 @@ class ProtocolCodec {
       case final MatchEndMsg m:
         w.bytes([_tagMatchEnd]);
         w.i32(m.reason.index);
+        w.i32(m.winnerSlot);
     }
     return w.toBytes();
   }
@@ -68,7 +69,7 @@ class ProtocolCodec {
         final len = r.i32();
         return SnapshotMsg(serverTick: st, ackedSeq: [a0, a1], stateBytes: r.bytes(len));
       case _tagMatchEnd:
-        return MatchEndMsg(reason: EndReason.values[r.i32()]);
+        return MatchEndMsg(reason: EndReason.values[r.i32()], winnerSlot: r.i32());
       default:
         throw ArgumentError('unknown protocol tag $tag');
     }

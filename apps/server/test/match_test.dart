@@ -73,4 +73,38 @@ void main() {
     // The valid input after the bad frame was acked.
     expect(snaps.last.ackedSeq[0], 1);
   });
+
+  test('core destroyed ends the match and notifies BOTH players with the winner', () {
+    final driver = FakeTickDriver();
+    final p0 = FakePlayerConn(), p1 = FakePlayerConn();
+    // Inject a sim with team1's core exposed + nearly dead, hero 0 adjacent.
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    sim.entity(kOuterTower1Id).hp = Fixed.zero;
+    sim.entity(kInnerTower1Id).hp = Fixed.zero;
+    sim.entity(kCore1Id).hp = Fixed.fromInt(5);
+    sim.entity(0).pos = FVec2(Fixed.fromInt(13), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    sim.entity(1).pos = FVec2(Fixed.fromInt(-40), Fixed.zero);
+    sim.entity(1).target = sim.entity(1).pos;
+    var endedCb = false;
+    final match = Match(seed: 1, sim: sim, driver: driver)
+      ..addPlayer(0, p0)
+      ..addPlayer(1, p1)
+      ..onEnded = () => endedCb = true;
+    match.start();
+    // Hero 0 right-clicks (locks) the enemy core; the held intent persists each
+    // tick, re-establishing the lock after the (hp-0) towers are swept on tick 0.
+    p0.receive(ProtocolCodec.encode(InputMsg(
+        slot: 0, seq: 1, clientTick: 0, aimX: kCore1Id, aimY: 0,
+        type: IntentType.attack.index)));
+    driver.pump(5);
+
+    expect(match.ended, isTrue);
+    expect(endedCb, isTrue);
+    for (final p in [p0, p1]) {
+      final end = p.sent.map(ProtocolCodec.decode).whereType<MatchEndMsg>().single;
+      expect(end.reason, EndReason.coreDestroyed);
+      expect(end.winnerSlot, 0);
+    }
+  });
 }

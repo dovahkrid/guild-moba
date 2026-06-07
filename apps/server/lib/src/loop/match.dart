@@ -10,11 +10,13 @@ import 'tick_driver.dart';
 /// Pure-ish authoritative match loop. Owns one Simulation + an IntentBuffer.
 /// Time enters only via the injected TickDriver; connections only via PlayerConn.
 class Match {
-  Match({required this.seed, required TickDriver driver}) : _driver = driver;
+  Match({required this.seed, required TickDriver driver, Simulation? sim})
+      : _driver = driver,
+        _sim = sim ?? Simulation.create(SimConfig(seed: seed));
 
   final int seed;
   final TickDriver _driver;
-  late final Simulation _sim = Simulation.create(SimConfig(seed: seed));
+  final Simulation _sim;
   final IntentBuffer _buffer = IntentBuffer();
   final List<PlayerConn?> _players = [null, null];
   final List<StreamSubscription<List<int>>> _subs = [];
@@ -67,6 +69,10 @@ class Match {
     if (ended) return;
     final intents = _buffer.drainForTick();
     _sim.step(_currentTick, intents);
+    if (_sim.winnerTeam != -1) {
+      _endWithWin(_sim.winnerTeam); // teamId == slot in 1v1
+      return;
+    }
     if (shouldSnapshot(_currentTick)) {
       final snap = ProtocolCodec.encode(SnapshotMsg(
         serverTick: _currentTick,
@@ -78,6 +84,28 @@ class Match {
       }
     }
     _currentTick++;
+  }
+
+  void _endWithWin(int winnerSlot) {
+    if (ended) return;
+    ended = true;
+    _driver.stop();
+    final snap = ProtocolCodec.encode(SnapshotMsg(
+      serverTick: _currentTick,
+      ackedSeq: [_buffer.lastAckedSeq[0], _buffer.lastAckedSeq[1]],
+      stateBytes: _sim.snapshotBytes(),
+    ));
+    final end = ProtocolCodec.encode(
+        MatchEndMsg(reason: EndReason.coreDestroyed, winnerSlot: winnerSlot));
+    for (final p in _players) {
+      p?.send(snap);
+      p?.send(end);
+      p?.close();
+    }
+    for (final sub in _subs) {
+      sub.cancel();
+    }
+    onEnded?.call();
   }
 
   void _onPlayerLeft(int slot) {
