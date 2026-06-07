@@ -21,6 +21,15 @@ const int kAbilityCooldownTicks = 240; // ~8s (> field duration → ≤1 active 
 // --- Slice roster (data) ---
 // hero 0 = Cinderfang (Pyro, Ember Field placed at his own position);
 // hero 1 = Marisol    (Hydro, Tidepool placed at the aim point).
-int heroElement(int heroId) =>
-    heroId == 0 ? Element.pyro.index : Element.hydro.index;
-bool heroPlacesAtSelf(int heroId) => heroId == 0;
+/// Element each hero applies. Slice roster is 1v1: heroId must be 0 or 1.
+int heroElement(int heroId) {
+  assert(heroId == 0 || heroId == 1, 'roster is 1v1: heroId must be 0 or 1');
+  return heroId == 0 ? Element.pyro.index : Element.hydro.index;
+}
+
+/// Whether this hero self-places its field (Cinderfang) vs aim-places (Marisol).
+/// Slice roster is 1v1: heroId must be 0 or 1.
+bool heroPlacesAtSelf(int heroId) {
+  assert(heroId == 0 || heroId == 1, 'roster is 1v1: heroId must be 0 or 1');
+  return heroId == 0;
+}

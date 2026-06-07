@@ -30,4 +30,11 @@ void main() {
     expect(heroPlacesAtSelf(0), isTrue); // Cinderfang: Ember Field at his feet
     expect(heroPlacesAtSelf(1), isFalse); // Marisol: Tidepool at the aim point
   });
+
+  test('roster helpers assert heroId is in the 1v1 range', () {
+    expect(heroElement(0), Element.pyro.index);
+    expect(heroElement(1), Element.hydro.index);
+    expect(() => heroElement(2), throwsA(isA<AssertionError>()));
+    expect(() => heroPlacesAtSelf(-1), throwsA(isA<AssertionError>()));
+  });
 }
