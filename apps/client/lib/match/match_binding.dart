@@ -48,6 +48,7 @@ class MatchBinding {
 
   /// Local input: a world point (Q16.16 raw). Predict immediately + send.
   void submitMoveTo(int aimXRaw, int aimYRaw) {
+    if (_ended) return; // no input after the match ends
     final c = _controller;
     if (c == null) return;
     final input = c.applyLocalInput(aimXRaw, aimYRaw);
@@ -56,6 +57,7 @@ class MatchBinding {
 
   /// Local input: right-click an enemy entity id -> attack-lock. Predict + send.
   void submitAttack(int targetId) {
+    if (_ended) return; // no input after the match ends
     final c = _controller;
     if (c == null) return;
     _transport.send(ProtocolCodec.encode(c.applyAttackInput(targetId)));
