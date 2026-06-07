@@ -174,4 +174,120 @@ void main() {
     expect(h.statusElement, -1); // swept after statusTimer hit 0
     expect(h.statusTimer, 0); // timer floored before the sweep cleared the element
   });
+
+  test('a different element detonates Vaporize: amplified dmg, status consumed, event', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final h = sim.entity(1)..pos = FVec2(Fixed.zero, Fixed.fromInt(7));
+    h.target = h.pos;
+    h.statusElement = Element.pyro.index; // pre-Pyro
+    h.statusTimer = 30;
+    final hpBefore = h.hp;
+    sim.fields.add(ElementalField(
+        ownerId: 0, center: h.pos, element: Element.hydro.index, timer: 100));
+    sim.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    final events = sim.step(0, const []);
+    expect(h.hp.raw, (hpBefore - (kFieldDotDamage * kVaporizeMult)).raw); // 1.0 × 1.3
+    expect(h.statusElement, -1); // consumed (no residual)
+    final rt = events.whereType<ReactionTriggered>().single;
+    expect(rt.unitId, 1);
+    expect(rt.reaction, Reaction.vaporize.index);
+    expect(rt.multiplierRaw, kVaporizeMult.raw);
+    expect(rt.sourceId, 0); // the field owner landed the triggering Hydro
+    expect(h.reactionIcd, kReactionIcdTicks); // ICD stamped
+  });
+
+  test('the reaction ICD blocks a second Vaporize until it expires', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final h = sim.entity(1)..pos = FVec2(Fixed.zero, Fixed.fromInt(7));
+    h.target = h.pos;
+    sim.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    // Overlap: a Pyro field AND a Hydro field on the hero (Pyro listed first).
+    sim.fields.add(ElementalField(
+        ownerId: 0, center: h.pos, element: Element.pyro.index, timer: 10000));
+    sim.fields.add(ElementalField(
+        ownerId: 1, center: h.pos, element: Element.hydro.index, timer: 10000));
+    var reactions = 0;
+    for (var t = 0; t < kReactionIcdTicks; t++) {
+      reactions += sim.step(t, const []).whereType<ReactionTriggered>().length;
+    }
+    expect(reactions, 1); // exactly one per ICD window, not one per tick
+  });
+
+  test('a status expiring this tick still reacts this tick, then is swept', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final h = sim.entity(1)..pos = FVec2(Fixed.zero, Fixed.fromInt(7));
+    h.target = h.pos;
+    h.statusElement = Element.pyro.index;
+    h.statusTimer = 1; // decrements to 0 BEFORE the field tick this tick
+    sim.fields.add(ElementalField(
+        ownerId: 0, center: h.pos, element: Element.hydro.index, timer: 100));
+    sim.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    final events = sim.step(0, const []);
+    expect(events.whereType<ReactionTriggered>(), isNotEmpty); // still reacted
+    expect(h.statusElement, -1); // then consumed/swept
+  });
+
+  test('Vaporize on a creep: amplified via an auto, ZERO via a field tick', () {
+    // (a) auto-triggered Vaporize on a creep deals real amplified damage.
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    for (var t = 0; t <= kFirstWaveTick; t++) {
+      sim.step(t, const []);
+    }
+    final creep = sim.entity(kCreepIdBase)..pos = FVec2(Fixed.fromInt(-8), Fixed.zero);
+    creep.statusElement = Element.hydro.index;
+    creep.statusTimer = 30;
+    final hpBefore = creep.hp;
+    final hero = sim.entity(0)..pos = creep.pos; // Cinderfang Pyro, adjacent
+    hero.target = hero.pos;
+    hero.attackTargetId = kCreepIdBase;
+    sim.entity(1).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(1).target = sim.entity(1).pos;
+    sim.step(kFirstWaveTick + 1, const []);
+    expect(creep.hp.raw, (hpBefore - (kHeroAttackDamage * kVaporizeMult)).raw); // 8 × 1.3
+    expect(creep.statusElement, -1);
+
+    // (b) field-triggered Vaporize on a creep deals ZERO (coat-not-farm).
+    final sim2 = Simulation.create(const SimConfig(seed: 1));
+    for (var t = 0; t <= kFirstWaveTick; t++) {
+      sim2.step(t, const []);
+    }
+    final c2 = sim2.entity(kCreepIdBase)..pos = FVec2(Fixed.fromInt(-8), Fixed.zero);
+    c2.statusElement = Element.pyro.index;
+    c2.statusTimer = 30;
+    final c2HpBefore = c2.hp.raw;
+    sim2.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim2.entity(0).target = sim2.entity(0).pos;
+    sim2.entity(1).pos = FVec2(Fixed.fromInt(40), Fixed.fromInt(2));
+    sim2.entity(1).target = sim2.entity(1).pos;
+    sim2.fields.add(ElementalField(
+        ownerId: 1, center: c2.pos, element: Element.hydro.index, timer: 100));
+    final events = sim2.step(kFirstWaveTick + 1, const []);
+    expect(events.whereType<ReactionTriggered>(), isNotEmpty); // reaction fired
+    expect(c2.hp.raw, c2HpBefore); // ZERO damage
+    expect(c2.statusElement, -1); // status still consumed
+  });
+
+  test('two-sided: a hero in their own field overlap eats the Vaporize', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final cinder = sim.entity(0); // Pyro
+    final spot = FVec2(Fixed.zero, Fixed.fromInt(7));
+    cinder.pos = spot;
+    cinder.target = spot;
+    cinder.statusElement = Element.hydro.index; // Hydro-statused (e.g. from Marisol)
+    cinder.statusTimer = 30;
+    sim.fields.add(ElementalField(
+        ownerId: 0, center: spot, element: Element.pyro.index, timer: 100)); // his own Pyro
+    sim.entity(1).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(1).target = sim.entity(1).pos;
+    final hpBefore = cinder.hp.raw;
+    final events = sim.step(0, const []);
+    final rt = events.whereType<ReactionTriggered>().single;
+    expect(rt.unitId, 0); // landed on Cinderfang himself
+    expect(rt.sourceId, 0); // his own field
+    expect(cinder.hp.raw, lessThan(hpBefore)); // self-damage
+    expect(cinder.statusElement, -1);
+  });
 }

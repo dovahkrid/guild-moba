@@ -6,6 +6,7 @@ import 'events.dart';
 import 'math/det_rng.dart';
 import 'math/fixed.dart';
 import 'math/fvec2.dart';
+import 'model/element.dart';
 import 'model/elemental_field.dart';
 import 'model/entity.dart';
 import 'model/intent.dart';
@@ -397,16 +398,35 @@ class Simulation {
   /// Element-application chokepoint (Plan 4). Autos + field ticks route through
   /// here; towers (non-elemental) call _applyDamage directly. Only heroes/creeps
   /// carry status. A 0-damage coat (a creep field tick) skips _applyDamage so it
-  /// neither last-hits nor spams DamageDealt. The Vaporize reaction is added next.
+  /// neither last-hits nor spams DamageDealt. A differing element on an already-
+  /// coated, ICD-ready unit detonates Vaporize (amplify + consume + emit).
   void _applyHit(
       Entity source, Entity target, Fixed baseDamage, int element, List<SimEvent> events) {
     if (target.kind != EntityKind.hero && target.kind != EntityKind.creep) {
       if (baseDamage.raw > 0) _applyDamage(source, target, baseDamage, events);
       return;
     }
-    target.statusElement = element; // coat (set/refresh)
-    target.statusTimer = kStatusDurationTicks;
-    if (baseDamage.raw > 0) _applyDamage(source, target, baseDamage, events);
+    Fixed dmg;
+    if (target.statusElement != -1 &&
+        target.statusElement != element &&
+        target.reactionIcd == 0) {
+      // Vaporize: amplify the TRIGGERING hit, consume the status, stamp the ICD.
+      dmg = baseDamage * kVaporizeMult;
+      target.statusElement = -1;
+      target.statusTimer = 0;
+      target.reactionIcd = kReactionIcdTicks;
+      events.add(ReactionTriggered(
+          unitId: target.id,
+          reaction: Reaction.vaporize.index,
+          multiplierRaw: kVaporizeMult.raw,
+          sourceId: source.id));
+    } else {
+      // Coat (set/refresh). A different element suppressed by ICD overwrites here.
+      target.statusElement = element;
+      target.statusTimer = kStatusDurationTicks;
+      dmg = baseDamage;
+    }
+    if (dmg.raw > 0) _applyDamage(source, target, dmg, events);
   }
 
   /// Field ticks: every active field coats each hero/creep within its radius
