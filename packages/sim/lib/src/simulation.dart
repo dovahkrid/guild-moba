@@ -193,6 +193,8 @@ class Simulation {
   /// derives from [_entityBodyCodecs] so it stays aligned with the writers when a
   /// field is added.
   static FVec2? peekEntityPos(Uint8List bytes, int id) {
+    assert(identical(_entityBodyCodecs.first, _posCodec),
+        'peekEntityPos derives pos via identical(c, _posCodec); _posCodec must be the first body codec');
     final r = ByteReader(bytes);
     r.i32(); // version
     r.i32(); // tick

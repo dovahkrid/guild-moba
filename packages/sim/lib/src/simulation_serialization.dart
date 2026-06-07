@@ -6,7 +6,7 @@ part of 'simulation.dart';
 /// [_entityBodyCodecs], so adding a serialized field (e.g. Plan 7 XP/level) is a
 /// one-row edit. The identity prefix (id, kind, teamId) is NOT here — it is read/
 /// written explicitly (id is the lookup key; kind/teamId are construction-only).
-class _EntityFieldCodec {
+final class _EntityFieldCodec {
   final void Function(ByteWriter w, Entity e) write;
   final void Function(ByteReader r, Entity e) readInto;
 
