@@ -86,6 +86,8 @@ void main() {
     p1.receive(ProtocolCodec.encode(InputMsg(
         slot: 1, seq: 1, clientTick: 0, aimX: 0, aimY: 0, type: IntentType.ability.index)));
     driver.pump(1); // tick 0 applies the cast
+    // p1's receive is synchronous (FakePlayerConn), so the single pumped tick
+    // drains + applies the buffered ability immediately.
     expect(sim.fields.where((f) => f.ownerId == 1), hasLength(1));
     // Run past field expiry AND a full ability cooldown. With the one-shot fix the
     // still-held cast must NOT re-fire (creeps spawn at tick 450, well past here).

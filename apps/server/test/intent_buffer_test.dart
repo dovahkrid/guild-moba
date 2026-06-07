@@ -47,8 +47,8 @@ void main() {
 
   test('ability is one-shot: drained once then cleared (no auto-recast)', () {
     final b = IntentBuffer();
-    b.accept(const InputMsg(
-        slot: 0, seq: 1, clientTick: 0, aimX: 0, aimY: 0, type: 3)); // type 3 = ability
+    b.accept(InputMsg(
+        slot: 0, seq: 1, clientTick: 0, aimX: 0, aimY: 0, type: IntentType.ability.index));
     final first = b.drainForTick();
     expect(first.where((i) => i.type == IntentType.ability), hasLength(1)); // fires this tick
     final second = b.drainForTick();
@@ -58,8 +58,8 @@ void main() {
   test('a held move persists while a one-shot ability fires exactly once', () {
     final b = IntentBuffer();
     b.accept(input(0, 1, aimX: 100)); // move (type 1), held
-    b.accept(const InputMsg(
-        slot: 0, seq: 2, clientTick: 0, aimX: 5, aimY: 0, type: 3)); // ability
+    b.accept(InputMsg(
+        slot: 0, seq: 2, clientTick: 0, aimX: 5, aimY: 0, type: IntentType.ability.index));
     final t0 = b.drainForTick();
     expect(t0.where((i) => i.type == IntentType.move), hasLength(1));
     expect(t0.where((i) => i.type == IntentType.ability), hasLength(1));
