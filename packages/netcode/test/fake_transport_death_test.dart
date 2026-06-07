@@ -9,8 +9,8 @@ MatchController _client({int seed = 1, int slot = 0}) =>
 
 void main() {
   // The enemy outer tower (team 1) sits at +kOuterTowerX; dropping the local hero
-  // there at ~0 hp lets the tower kill it deterministically (only damage source:
-  // first creep wave is tick 450, beyond these runs).
+  // there at ~0 hp lets the tower kill it deterministically (the only damage
+  // source — the first creep wave, kFirstWaveTick, is beyond these runs).
   test('FakeTransport mirrors the server: death cancels the held order (respawn stands still)', () {
     final t = FakeTransport(
         seed: 1, client: _client(), localSlot: 0, oneWayLatencyMs: 0, lossRate: 0.0);
@@ -27,7 +27,7 @@ void main() {
     t.server.entity(0).hp = Fixed.raw(1);
 
     // Run through death + full respawn + a buffer for any re-fed order to move it.
-    for (var i = 0; i < kHeroRespawnTicks + 40; i++) {
+    for (var i = 0; i < kHeroRespawnTicks + 40; i++) { // +40: generous post-respawn buffer; a surviving held order (~0.15/tick) would be several units off spawn by now
       t.tickWorld();
     }
 
@@ -59,7 +59,7 @@ void main() {
         slot: 0, seq: 5, clientTick: 0,
         aimX: Fixed.fromInt(20).raw, aimY: 0, type: IntentType.move.index));
 
-    for (var i = 0; i < kHeroRespawnTicks + 40; i++) {
+    for (var i = 0; i < kHeroRespawnTicks + 40; i++) { // +40: generous post-respawn buffer; a surviving held order (~0.15/tick) would be several units off spawn by now
       t.tickWorld();
     }
 

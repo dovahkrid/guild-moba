@@ -13,6 +13,12 @@ class _InFlight<T> {
 /// Headless server<->client link with a virtual integer-ms clock, injectable
 /// one-way latency and deterministic loss. Drives a real server Simulation
 /// against a real MatchController. dtMs=33 matches InterpolationBuffer.dtMs.
+///
+/// MAINTENANCE: the intent-accept logic (held move/attack vs one-shot ability,
+/// seq-dedupe, downed-slot drop) and the HeroDowned clearSlot below MANUALLY
+/// replicate the real server — apps/server/lib/src/loop/match.dart
+/// (Match.addPlayer + _tick) and intent_buffer.dart (IntentBuffer.accept /
+/// drainForTick / clearSlot). Keep this in sync if either changes.
 class FakeTransport {
   static const int dtMs = InterpolationBuffer.dtMs;
   final int seed;
@@ -96,6 +102,7 @@ class FakeTransport {
       final m = f.payload;
       if (m.slot < 0 || m.slot > 1) return true; // out-of-range: drop
       if (server.entity(m.slot).isDowned) return true; // dead heroes take no orders
+      if (m.type < 0 || m.type >= IntentType.values.length) return true; // bad type: drop (mirror IntentBuffer.accept)
       if (m.seq > _ackedSeq[m.slot]) {
         _ackedSeq[m.slot] = m.seq;
         final intent = Intent(
