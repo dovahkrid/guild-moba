@@ -184,7 +184,7 @@ class Simulation {
 
   Entity? _acquireTowerTarget(Entity tower) {
     Entity? best;
-    Fixed bestSq = Fixed.zero;
+    Fixed bestSq = Fixed.zero; // sentinel; only read once best != null
     for (final id in entityIdsSorted) {
       final c = _byId[id]!;
       if (c.kind != EntityKind.hero) continue;

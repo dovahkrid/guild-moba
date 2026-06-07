@@ -143,7 +143,7 @@ void main() {
     sim.entity(0).target = sim.entity(0).pos;
     sim.entity(1).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
     sim.entity(1).target = sim.entity(1).pos;
-    // Hero 0 locks the 10-hp outer tower; one hit kills it this tick.
+    // Hero 0 locks the outer tower (hp set to exactly one hero hit above).
     final events = sim.step(0, const [Intent(playerSlot: 0, type: IntentType.attack, aimX: kOuterTower1Id, seq: 1)]);
     expect(sim.entityIdsSorted.contains(kOuterTower1Id), isFalse); // despawned
     expect(sim.isStructureVulnerable(sim.entity(kInnerTower1Id)), isTrue);
