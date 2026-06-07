@@ -7,7 +7,7 @@ import '../math/fixed.dart';
 const int kTicksPerSecond = 30; // server tick rate; seconds × 30 = ticks.
 
 // --- Hero auto-attack ---
-final Fixed kHeroMaxHp = Fixed.fromInt(100); // hit-points at full health
+final Fixed kHeroMaxHp = Fixed.fromInt(100);
 final Fixed kHeroAttackRange = Fixed.fromNum(3); // world-units
 final Fixed kHeroAttackRangeSq = Fixed.fromNum(3 * 3); // compare vs lengthSq, no sqrt
 final Fixed kHeroAttackDamage = Fixed.fromNum(8); // damage per auto-attack hit
@@ -27,14 +27,14 @@ final Fixed kCoreMaxHp = Fixed.fromInt(400); // hit-points; destroying it ends t
 
 // --- Neutral creeps (slice = passive last-hit fodder; spec §6: 5/wave) ---
 final Fixed kCreepMaxHp = Fixed.fromInt(60); // hit-points per neutral creep
-const int kCreepsPerWave = 3; // creeps spawned per wave (one wave per lane side)
+const int kCreepsPerWave = 3; // creeps spawned per wave
 const int kFirstWaveTick = 450; // 0:15
 const int kWaveIntervalTicks = 900; // 30s
 
 // --- Gold (last-hit; spec §6 values) ---
 const int kCreepGold = 18; // melee-equivalent neutral creep
-const int kOuterTowerGold = 200;
-const int kInnerTowerGold = 300;
+const int kOuterTowerGold = 200; // gold awarded for destroying an outer tower
+const int kInnerTowerGold = 300; // gold awarded for destroying an inner tower
 
 // --- Lane geometry: single horizontal lane, mirror-symmetric on x, y = 0.
 // Team 0 occupies negative x; team 1 positive x. Magnitudes are per-side
