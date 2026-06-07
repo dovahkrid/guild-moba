@@ -32,6 +32,7 @@ void main() {
     expect(sim.fields, hasLength(1));
     sim.step(1, const [Intent(playerSlot: 1, type: IntentType.ability, aimX: 131072, aimY: 0, seq: 2)]);
     expect(sim.fields, hasLength(1)); // on cooldown → not recast
+    expect(sim.fields.single.center.x.toDouble(), 0.0); // original field, not replaced by the cooldown-blocked recast
   });
 
   test('a field expires after its duration', () {

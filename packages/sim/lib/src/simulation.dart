@@ -112,7 +112,10 @@ class Simulation {
         hero.attackTargetId = it.aimX; // aimX carries the target entity id
       } else if (it.type == IntentType.ability) {
         if (hero.abilityCooldown != 0) continue; // on cooldown → ignore the cast
-        _fields.removeWhere((f) => f.ownerId == hero.id); // ≤1 active field per hero
+        _fields.removeWhere((f) => f.ownerId == hero.id); // ≤1 active field/hero —
+        // structural insurance: today the cooldown (>field duration) already
+        // guarantees the prior field expired, but this keeps the invariant even
+        // if those constants change. Do not remove as "dead code".
         final center = heroPlacesAtSelf(hero.id)
             ? hero.pos // Cinderfang: Ember Field at his feet (melee)
             : FVec2(Fixed.raw(it.aimX), Fixed.raw(it.aimY)); // Marisol: Tidepool at aim
@@ -215,7 +218,8 @@ class Simulation {
       }
     }
     // Tick every per-unit timer down first (statusTimer is swept to -1 AFTER
-    // reactions in Task 5; reactionIcd guards the next reaction).
+    // reactions in Task 5; reactionIcd guards the next reaction). Runs for every
+    // entity incl. downed heroes — their status/icd are reset on respawn regardless.
     for (final e in _entities) {
       if (e.attackCooldown > 0) e.attackCooldown -= 1;
       if (e.abilityCooldown > 0) e.abilityCooldown -= 1;
