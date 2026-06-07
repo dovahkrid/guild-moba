@@ -71,4 +71,9 @@ class Entity {
   })  : maxHp = maxHp ?? hp,
         vel = vel ?? FVec2.zero,
         target = target ?? pos;
+
+  /// True while a hero is dead/respawning: untargetable, ignores input, does not
+  /// pursue or attack. respawnTimer>0 after the death sweep; hp<=0 on the death
+  /// tick itself (or from a same-tick burst) before the sweep parks it.
+  bool get isDowned => respawnTimer != 0 || hp.raw <= 0;
 }

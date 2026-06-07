@@ -105,7 +105,7 @@ class Simulation {
     for (final it in ordered) {
       if (it.playerSlot < 0 || it.playerSlot >= 2) continue;
       final hero = _byId[it.playerSlot]!;
-      if (hero.respawnTimer != 0 || hero.hp.raw <= 0) continue; // downed (incl. dropped to 0 by a same-tick burst): ignore input
+      if (hero.isDowned) continue; // downed (incl. dropped to 0 by a same-tick burst): ignore input
       if (it.type == IntentType.move) {
         hero.target = FVec2(Fixed.raw(it.aimX), Fixed.raw(it.aimY));
         hero.attackTargetId = -1;
@@ -239,7 +239,7 @@ class Simulation {
     // (step 2) has already closed distance; here we just fire when in range.
     for (final id in entityIdsSorted) {
       final e = _byId[id]!;
-      if (e.kind != EntityKind.hero || e.respawnTimer != 0 || e.hp.raw <= 0) continue;
+      if (e.kind != EntityKind.hero || e.isDowned) continue;
       if (e.attackCooldown > 0 || e.attackTargetId == -1) continue;
       final tgt = _byId[e.attackTargetId];
       if (tgt == null || !_isAttackable(e, tgt)) continue;
