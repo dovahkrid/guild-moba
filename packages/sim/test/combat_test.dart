@@ -8,6 +8,9 @@ void main() {
     final maxima = <Fixed>[
       kHeroMaxHp, kOuterTowerMaxHp, kInnerTowerMaxHp, kCoreMaxHp, kCreepMaxHp,
       kHeroAttackDamage, kTowerAttackDamage, kHeroAttackRangeSq, kTowerAttackRangeSq,
+      // geometry
+      kHero0SpawnX, kHero1SpawnX, kOuterTowerX, kInnerTowerX, kCoreX,
+      kCreepSpawnSpacing,
     ];
     for (final f in maxima) {
       expect(f.toDouble().abs() < 32768, isTrue, reason: '$f exceeds budget');
