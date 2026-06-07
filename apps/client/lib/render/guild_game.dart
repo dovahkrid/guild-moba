@@ -2,7 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:netcode/netcode.dart' show MatchView, RenderEntity;
-import 'package:sim/sim.dart' show EntityKind;
+import 'package:sim/sim.dart' show EntityKind, kOne;
 
 import '../match/match_binding.dart';
 import 'coord.dart';
@@ -50,6 +50,7 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
       }
       view.target.setValues(worldToFlameX(re.x), worldToFlameY(re.y));
       view.hpRatio = re.maxHp > 0 ? re.hp / re.maxHp : 1.0;
+      view.statusElement = re.statusElement; // discrete; never interpolated
     }
     // Despawn views whose entity is gone (dead creep / fallen tower / dead core).
     final gone = _views.keys.where((id) => !seen.contains(id)).toList();
@@ -57,10 +58,6 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
       _views.remove(id)?.removeFromParent();
     }
 
-    // Feed elemental status to each entity view (discrete; never interpolated).
-    for (final re in v.entities) {
-      _views[re.id]?.statusElement = re.statusElement;
-    }
     // Diff field zones (keyed by ownerId).
     final seenFields = <int>{};
     for (final rf in v.fields) {
@@ -79,7 +76,7 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
     }
     // Spawn a pop-text per reaction that fired this frame.
     for (final r in binding.drainReactions()) {
-      final mult = r.multiplierRaw / 65536.0;
+      final mult = r.multiplierRaw / kOne; // Q16.16 raw → double (int / int = double in Dart)
       world.add(ReactionLabel(
         text: 'VAPORIZE x${mult.toStringAsFixed(1)}',
         position: Vector2(worldToFlameX(r.x), worldToFlameY(r.y)),

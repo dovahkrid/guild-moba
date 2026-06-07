@@ -1,5 +1,5 @@
 import 'package:flame/components.dart';
-import 'package:flutter/painting.dart';
+import 'package:flutter/painting.dart'; // Flame's TextPaint needs Flutter's TextStyle (not exported by dart:ui)
 
 /// A transient floating reaction pop-text (Plan 4). Rises, then self-removes.
 class ReactionLabel extends TextComponent {
