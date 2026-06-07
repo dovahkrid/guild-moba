@@ -74,6 +74,25 @@ void main() {
     expect(snaps.last.ackedSeq[0], 1);
   });
 
+  test('a held ability does NOT auto-recast after its cooldown (one-shot)', () {
+    final driver = FakeTickDriver();
+    final p0 = FakePlayerConn(), p1 = FakePlayerConn();
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    Match(seed: 1, sim: sim, driver: driver)
+      ..addPlayer(0, p0)
+      ..addPlayer(1, p1)
+      ..start();
+    // Hero 1 casts once (aim irrelevant; no enemy in range → no burst kills).
+    p1.receive(ProtocolCodec.encode(InputMsg(
+        slot: 1, seq: 1, clientTick: 0, aimX: 0, aimY: 0, type: IntentType.ability.index)));
+    driver.pump(1); // tick 0 applies the cast
+    expect(sim.fields.where((f) => f.ownerId == 1), hasLength(1));
+    // Run past field expiry AND a full ability cooldown. With the one-shot fix the
+    // still-held cast must NOT re-fire (creeps spawn at tick 450, well past here).
+    driver.pump(kAbilityCooldownTicks + 5);
+    expect(sim.fields.where((f) => f.ownerId == 1), isEmpty); // expired, not recast
+  });
+
   test('core destroyed ends the match and notifies BOTH players with the winner', () {
     final driver = FakeTickDriver();
     final p0 = FakePlayerConn(), p1 = FakePlayerConn();

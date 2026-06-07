@@ -1,5 +1,6 @@
 import 'package:protocol/protocol.dart';
 import 'package:server/src/loop/intent_buffer.dart';
+import 'package:sim/sim.dart';
 import 'package:test/test.dart';
 
 InputMsg input(int slot, int seq, {int aimX = 0}) =>
@@ -42,5 +43,29 @@ void main() {
         slot: 0, seq: 1, clientTick: 0, aimX: 0, aimY: 0, type: 99);
     expect(b.accept(badMsg), isFalse);
     expect(b.lastAckedSeq[0], 0); // unchanged
+  });
+
+  test('ability is one-shot: drained once then cleared (no auto-recast)', () {
+    final b = IntentBuffer();
+    b.accept(const InputMsg(
+        slot: 0, seq: 1, clientTick: 0, aimX: 0, aimY: 0, type: 3)); // type 3 = ability
+    final first = b.drainForTick();
+    expect(first.where((i) => i.type == IntentType.ability), hasLength(1)); // fires this tick
+    final second = b.drainForTick();
+    expect(second.where((i) => i.type == IntentType.ability), isEmpty); // NOT repeated next tick
+  });
+
+  test('a held move persists while a one-shot ability fires exactly once', () {
+    final b = IntentBuffer();
+    b.accept(input(0, 1, aimX: 100)); // move (type 1), held
+    b.accept(const InputMsg(
+        slot: 0, seq: 2, clientTick: 0, aimX: 5, aimY: 0, type: 3)); // ability
+    final t0 = b.drainForTick();
+    expect(t0.where((i) => i.type == IntentType.move), hasLength(1));
+    expect(t0.where((i) => i.type == IntentType.ability), hasLength(1));
+    final t1 = b.drainForTick();
+    expect(t1.where((i) => i.type == IntentType.move), hasLength(1)); // move still held
+    expect(t1.where((i) => i.type == IntentType.ability), isEmpty); // ability gone
+    expect(b.lastAckedSeq[0], 2); // both inputs acked
   });
 }
