@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+// ignore: unused_import
+import 'data/combat.dart'; // used in Task 4 (create())
 import 'math/det_rng.dart';
 import 'math/fixed.dart';
 import 'math/fvec2.dart';
@@ -9,12 +11,12 @@ import 'model/sim_config.dart';
 import 'state/byte_writer.dart';
 
 /// Version of the canonicalBytes() determinism format (the replay-golden hash).
-const int kSchemaVersion = 1;
+const int kSchemaVersion = 2;
 
 /// Version of the snapshotBytes() netcode format (superset incl. Entity.target).
 /// Independent from kSchemaVersion so the determinism golden never moves when
 /// the wire format evolves.
-const int kSnapshotVersion = 1;
+const int kSnapshotVersion = 2;
 
 /// Stable entity id for the wanderer NPC (created in [Simulation.create]).
 const int kWandererEntityId = 2;
@@ -28,6 +30,12 @@ final Fixed _kWanderStep = Fixed.fromNum(0.05);
 /// determinism end-to-end.
 class Simulation {
   int tick = 0;
+
+  /// -1 = undecided; otherwise the teamId whose enemy core was destroyed (the
+  /// winner). Set in step() (Task 10); serialized so prediction/reconcile agree.
+  int _winnerTeam = -1;
+  int get winnerTeam => _winnerTeam;
+
   DetRng _rng;
   final List<Entity> _entities;
   final Map<int, Entity> _byId;
@@ -113,6 +121,7 @@ class Simulation {
     w.i32(tick);
     w.u32(_rng.stateLo); // RNG limbs are unsigned 32-bit; use u32 (see ByteWriter)
     w.u32(_rng.stateHi);
+    w.i32(_winnerTeam);
 
     final ids = entityIdsSorted;
     w.i32(ids.length);
@@ -126,6 +135,11 @@ class Simulation {
       w.fixed(e.vel.x);
       w.fixed(e.vel.y);
       w.fixed(e.hp);
+      w.fixed(e.maxHp);
+      w.i32(e.attackCooldown);
+      w.i32(e.gold);
+      w.i32(e.respawnTimer);
+      w.i32(e.attackTargetId);
     }
     return w.toBytes();
   }
@@ -142,6 +156,7 @@ class Simulation {
     w.i32(tick);
     w.u32(_rng.stateLo);
     w.u32(_rng.stateHi);
+    w.i32(_winnerTeam);
     final ids = entityIdsSorted;
     w.i32(ids.length);
     for (final id in ids) {
@@ -154,6 +169,11 @@ class Simulation {
       w.fixed(e.vel.x);
       w.fixed(e.vel.y);
       w.fixed(e.hp);
+      w.fixed(e.maxHp);
+      w.i32(e.attackCooldown);
+      w.i32(e.gold);
+      w.i32(e.respawnTimer);
+      w.i32(e.attackTargetId);
       w.fixed(e.target.x);
       w.fixed(e.target.y);
     }
@@ -177,6 +197,7 @@ class Simulation {
     final lo = r.u32();
     final hi = r.u32();
     _rng = DetRng.fromState(lo, hi);
+    _winnerTeam = r.i32();
     final count = r.i32();
     for (var i = 0; i < count; i++) {
       final id = r.i32();
@@ -186,6 +207,11 @@ class Simulation {
       e.pos = FVec2(r.fixed(), r.fixed());
       e.vel = FVec2(r.fixed(), r.fixed());
       e.hp = r.fixed();
+      e.maxHp = r.fixed();
+      e.attackCooldown = r.i32();
+      e.gold = r.i32();
+      e.respawnTimer = r.i32();
+      e.attackTargetId = r.i32();
       e.target = FVec2(r.fixed(), r.fixed());
     }
   }
@@ -198,6 +224,7 @@ class Simulation {
     r.i32(); // tick
     r.u32(); // rng lo
     r.u32(); // rng hi
+    r.i32(); // winnerTeam
     final count = r.i32();
     for (var i = 0; i < count; i++) {
       final eid = r.i32();
@@ -206,6 +233,11 @@ class Simulation {
       final pos = FVec2(r.fixed(), r.fixed());
       r.fixed(); r.fixed(); // vel
       r.fixed(); // hp
+      r.fixed(); // maxHp
+      r.i32(); // attackCooldown
+      r.i32(); // gold
+      r.i32(); // respawnTimer
+      r.i32(); // attackTargetId
       r.fixed(); r.fixed(); // target
       if (eid == id) return pos;
     }

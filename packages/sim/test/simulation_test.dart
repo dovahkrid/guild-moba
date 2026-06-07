@@ -23,8 +23,10 @@ void main() {
   test('identical seed + inputs produce identical state hash (determinism)', () {
     Simulation run() {
       final s = Simulation.create(const SimConfig(seed: 1337));
-      const m0 = Intent(playerSlot: 0, type: IntentType.move, aimX: 655360, aimY: 131072, seq: 1);
-      const m1 = Intent(playerSlot: 1, type: IntentType.move, aimX: -655360, aimY: 131072, seq: 1);
+      // Combat-free anchor: heroes move APART (toward their own inner towers) so
+      // adding combat behavior in later tasks never disturbs this pinned hash.
+      const m0 = Intent(playerSlot: 0, type: IntentType.move, aimX: -655360, aimY: 131072, seq: 1);
+      const m1 = Intent(playerSlot: 1, type: IntentType.move, aimX: 655360, aimY: 131072, seq: 1);
       for (var t = 0; t < 300; t++) {
         s.step(t, [m0, m1]);
       }
@@ -45,11 +47,13 @@ void main() {
   // cross-platform golden in tooling/replay_fixtures/smoke.golden).
   test('pinned 300-tick canonical state hash', () {
     final s = Simulation.create(const SimConfig(seed: 1337));
-    const m0 = Intent(playerSlot: 0, type: IntentType.move, aimX: 655360, aimY: 131072, seq: 1);
-    const m1 = Intent(playerSlot: 1, type: IntentType.move, aimX: -655360, aimY: 131072, seq: 1);
+    // Combat-free anchor: heroes move APART (toward their own inner towers) so
+    // adding combat behavior in later tasks never disturbs this pinned hash.
+    const m0 = Intent(playerSlot: 0, type: IntentType.move, aimX: -655360, aimY: 131072, seq: 1);
+    const m1 = Intent(playerSlot: 1, type: IntentType.move, aimX: 655360, aimY: 131072, seq: 1);
     for (var t = 0; t < 300; t++) {
       s.step(t, [m0, m1]);
     }
-    expect(s.canonicalStateHash(), 0xa00d6337);
+    expect(s.canonicalStateHash(), 0xbab1ed9a);
   });
 }

@@ -3,8 +3,10 @@ import 'package:test/test.dart';
 
 Simulation _run(int ticks) {
   final s = Simulation.create(const SimConfig(seed: 1337));
-  const m0 = Intent(playerSlot: 0, type: IntentType.move, aimX: 655360, aimY: 131072, seq: 1);
-  const m1 = Intent(playerSlot: 1, type: IntentType.move, aimX: -655360, aimY: 131072, seq: 1);
+  // Combat-free anchor: heroes move APART (toward their own inner towers) so
+  // adding combat behavior in later tasks never disturbs this pinned hash.
+  const m0 = Intent(playerSlot: 0, type: IntentType.move, aimX: -655360, aimY: 131072, seq: 1);
+  const m1 = Intent(playerSlot: 1, type: IntentType.move, aimX: 655360, aimY: 131072, seq: 1);
   for (var t = 0; t < ticks; t++) {
     s.step(t, [m0, m1]);
   }
@@ -48,6 +50,24 @@ void main() {
   });
 
   test('canonicalBytes/hash unchanged (golden untouched)', () {
-    expect(_run(300).canonicalStateHash(), 0xa00d6337);
+    expect(_run(300).canonicalStateHash(), 0xbab1ed9a);
+  });
+
+  test('snapshot round-trips combat fields (gold, cooldown, respawn, maxHp, winnerTeam)', () {
+    final src = Simulation.create(const SimConfig(seed: 1337));
+    // Mutate combat fields directly to prove they serialize (no combat logic yet).
+    src.entity(0).gold = 42;
+    src.entity(0).attackCooldown = 7;
+    src.entity(0).attackTargetId = 1; // hero 0 locked onto hero 1
+    src.entity(1).respawnTimer = 13;
+    final dst = Simulation.create(const SimConfig(seed: 1337))
+      ..restoreFromSnapshot(src.snapshotBytes());
+    expect(dst.entity(0).gold, 42);
+    expect(dst.entity(0).attackCooldown, 7);
+    expect(dst.entity(0).attackTargetId, 1);
+    expect(dst.entity(1).respawnTimer, 13);
+    expect(dst.entity(0).maxHp.raw, src.entity(0).maxHp.raw);
+    expect(dst.entity(2).maxHp.raw, src.entity(2).maxHp.raw); // wanderer maxHp=50 round-trips
+    expect(dst.canonicalStateHash(), src.canonicalStateHash());
   });
 }
