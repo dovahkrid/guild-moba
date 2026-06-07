@@ -1,0 +1,10 @@
+{
+  "seed": 1337,
+  "ticks": 120,
+  "inputLog": {
+    "0": [{"playerSlot":0,"type":1,"aimX":0,"aimY":458752,"seq":1,"clientTick":0},
+          {"playerSlot":1,"type":1,"aimX":0,"aimY":458752,"seq":1,"clientTick":0}],
+    "60":[{"playerSlot":0,"type":3,"aimX":0,"aimY":458752,"seq":2,"clientTick":60},
+          {"playerSlot":1,"type":3,"aimX":0,"aimY":458752,"seq":2,"clientTick":60}]
+  }
+}
