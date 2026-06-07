@@ -2,6 +2,8 @@ import 'package:sim/sim.dart';
 import 'package:test/test.dart';
 
 /// A landed reaction with the tick it fired on (harness/log-only telemetry).
+/// `unitId` is captured for a future per-hero reaction breakdown; this test only
+/// asserts on `tick` (TT2E).
 class _Sample {
   final int tick;
   final int unitId;
@@ -32,7 +34,8 @@ void main() {
     }
     expect(samples, isNotEmpty, reason: 'a Pyro+Hydro overlap must produce Vaporize');
     final tt2e = samples.first.tick; // ticks to the first landed reaction
-    expect(tt2e, lessThanOrEqualTo(45), reason: 'second element within ~1.5s (spec §4.1 gate)');
+    expect(tt2e, lessThanOrEqualTo(45),
+        reason: 'second element within ~1.5s (TT2E hard gate: parent §4.1, surfaced via plan-4 §8)');
     final perMin = samples.length * 1800 / totalTicks; // 30Hz → 1800 ticks/min
     expect(perMin, greaterThan(0));
     // Human-readable TT2E log (spec §8).
