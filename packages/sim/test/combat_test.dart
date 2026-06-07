@@ -250,6 +250,7 @@ void main() {
     sim.entity(1).target = sim.entity(1).pos;
     sim.step(0, const [Intent(playerSlot: 0, type: IntentType.attack, aimX: kOuterTower1Id, seq: 1)]);
     expect(sim.entity(0).gold, kOuterTowerGold);
+    expect(sim.entity(1).gold, 0); // only the last-hitter is credited
   });
 
   test('a hero last-hits a full 60-hp creep via real attack cadence (no shortcut)', () {

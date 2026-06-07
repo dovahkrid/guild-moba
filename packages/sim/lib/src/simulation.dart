@@ -214,8 +214,8 @@ class Simulation {
       _applyDamage(e, target, kTowerAttackDamage, events);
       e.attackCooldown = kTowerAttackCooldownTicks;
     }
-    // Despawn dead structures (towers/cores). Heroes (Task 7) and creeps
-    // (Task 9) are handled by their own systems.
+    // Despawn the dead, each via its own sweep: structures (towers/cores),
+    // then heroes (downed, not removed), then creeps.
     _sweepDeadStructures(events);
     _sweepDeadHeroes();
     _sweepDeadCreeps(events);
@@ -254,6 +254,9 @@ class Simulation {
   /// A hero's spawn x by team (team 0 negative side, team 1 positive side).
   Fixed _heroSpawnX(Entity e) => e.teamId == 0 ? kHero0SpawnX : kHero1SpawnX;
 
+  /// Whether [id] is one of the two inner towers (vs an outer tower).
+  bool _isInnerTower(int id) => id == kInnerTower0Id || id == kInnerTower1Id;
+
   Entity? _acquireTowerTarget(Entity tower) {
     Entity? best;
     Fixed bestSq = Fixed.zero; // sentinel; only read once best != null
@@ -281,7 +284,7 @@ class Simulation {
     for (final e in dead) {
       if (e.kind == EntityKind.tower) {
         final killerId = _lastDamagerOf(e.id);
-        final isInner = e.id == kInnerTower0Id || e.id == kInnerTower1Id;
+        final isInner = _isInnerTower(e.id);
         _creditGold(killerId, isInner ? kInnerTowerGold : kOuterTowerGold);
         events.add(TowerDestroyed(towerId: e.id, teamId: e.teamId, killerId: killerId));
       }
@@ -293,8 +296,7 @@ class Simulation {
   /// its team's outer tower is gone; a core only after BOTH its towers are gone.
   bool isStructureVulnerable(Entity e) {
     if (e.kind == EntityKind.tower) {
-      final isInner = e.id == kInnerTower0Id || e.id == kInnerTower1Id;
-      if (!isInner) return true; // outer
+      if (!_isInnerTower(e.id)) return true; // outer
       final outerId = e.teamId == 0 ? kOuterTower0Id : kOuterTower1Id;
       return !_byId.containsKey(outerId);
     }
