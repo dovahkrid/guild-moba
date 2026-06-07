@@ -229,7 +229,7 @@ class Simulation {
     for (final f in _fields) {
       if (f.timer > 0) f.timer -= 1;
     }
-    // (Task 5 inserts `_stepFields(events);` HERE — field ticks coat units in range.)
+    _stepFields(events); // field ticks coat units in range (may react — next task)
     _fields.removeWhere((f) => f.timer <= 0); // expired fields gone (after their final tick)
     // Heroes attack ONLY their locked target, in ascending-id order. Pursue
     // (step 2) has already closed distance; here we just fire when in range.
@@ -240,7 +240,7 @@ class Simulation {
       final tgt = _byId[e.attackTargetId];
       if (tgt == null || !_isAttackable(e, tgt)) continue;
       if ((tgt.pos - e.pos).lengthSq() > kHeroAttackRangeSq) continue; // not yet in range
-      _applyDamage(e, tgt, kHeroAttackDamage, events);
+      _applyHit(e, tgt, kHeroAttackDamage, heroElement(e.id), events);
       e.attackCooldown = kHeroAttackCooldownTicks;
     }
     // Towers fire at the nearest enemy hero in range.
@@ -251,6 +251,10 @@ class Simulation {
       if (target == null) continue;
       _applyDamage(e, target, kTowerAttackDamage, events);
       e.attackCooldown = kTowerAttackCooldownTicks;
+    }
+    // Sweep expired statuses (a status expiring this tick already reacted above).
+    for (final e in _entities) {
+      if (e.statusTimer == 0 && e.statusElement != -1) e.statusElement = -1;
     }
     // Despawn the dead, each via its own sweep: structures (towers/cores),
     // then heroes (downed, not removed), then creeps.
@@ -387,6 +391,38 @@ class Simulation {
     events.add(DamageDealt(
         sourceId: source.id, targetId: target.id, amountRaw: amount.raw));
     return hp.raw <= 0;
+  }
+
+  /// Element-application chokepoint (Plan 4). Autos + field ticks route through
+  /// here; towers (non-elemental) call _applyDamage directly. Only heroes/creeps
+  /// carry status. A 0-damage coat (a creep field tick) skips _applyDamage so it
+  /// neither last-hits nor spams DamageDealt. The Vaporize reaction is added next.
+  void _applyHit(
+      Entity source, Entity target, Fixed baseDamage, int element, List<SimEvent> events) {
+    if (target.kind != EntityKind.hero && target.kind != EntityKind.creep) {
+      if (baseDamage.raw > 0) _applyDamage(source, target, baseDamage, events);
+      return;
+    }
+    target.statusElement = element; // coat (set/refresh)
+    target.statusTimer = kStatusDurationTicks;
+    if (baseDamage.raw > 0) _applyDamage(source, target, baseDamage, events);
+  }
+
+  /// Field ticks: every active field coats each hero/creep within its radius
+  /// (2-sided — the owner is not exempt). DoT is real on heroes, ZERO on creeps
+  /// (coat-not-farm). Iterates entityIdsSorted for determinism.
+  void _stepFields(List<SimEvent> events) {
+    for (final f in _fields) {
+      for (final id in entityIdsSorted) {
+        final u = _byId[id]!;
+        if (u.kind != EntityKind.hero && u.kind != EntityKind.creep) continue;
+        if (u.hp.raw <= 0) continue;
+        if (u.kind == EntityKind.hero && u.respawnTimer != 0) continue; // downed
+        if ((u.pos - f.center).lengthSq() > kFieldRadiusSq) continue;
+        final dot = u.kind == EntityKind.creep ? Fixed.zero : kFieldDotDamage;
+        _applyHit(_byId[f.ownerId]!, u, dot, f.element, events);
+      }
+    }
   }
 
   /// Canonical, integer-only, ordered byte encoding of the full state.
