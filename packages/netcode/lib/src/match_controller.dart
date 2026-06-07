@@ -118,13 +118,14 @@ class MatchController {
   void advanceClientTick() {
     final held = _heldAt(_nextTick);
     final events = _predicted.step(_nextTick, held == null ? const [] : [held]);
+    final presentIds = _predicted.entityIdsSorted.toSet(); // snapshot once (entityIdsSorted re-sorts per call)
     for (final e in events) {
       if (e is! ReactionTriggered) continue;
-      final present = _predicted.entityIdsSorted.contains(e.unitId);
-      final pos = present ? _predicted.entity(e.unitId).pos : null;
+      if (!presentIds.contains(e.unitId)) continue; // reacting unit gone (shouldn't happen) — skip cosmetic pop-text
+      final pos = _predicted.entity(e.unitId).pos;
       _recentReactions.add(RenderReaction(
-        x: pos?.x.toDouble() ?? 0,
-        y: pos?.y.toDouble() ?? 0,
+        x: pos.x.toDouble(),
+        y: pos.y.toDouble(),
         reaction: e.reaction,
         multiplierRaw: e.multiplierRaw,
       ));

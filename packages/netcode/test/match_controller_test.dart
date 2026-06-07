@@ -80,7 +80,7 @@ void main() {
     expect(v.fields, isNotEmpty);
     expect(v.fields.first.ownerId, 1);
     expect(v.fields.first.element, Element.hydro.index);
-    expect(v.local.statusElement, isA<int>()); // plumbed (−1 until coated)
+    expect(v.local.statusElement, -1); // no coat yet → none (plumbed through, real value)
   });
 
   test('drainReactions returns + clears (empty when nothing reacted)', () {

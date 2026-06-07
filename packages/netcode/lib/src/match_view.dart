@@ -72,6 +72,7 @@ class MatchView {
   /// The local hero's render entity (predicted).
   RenderEntity get local => entities.firstWhere((e) => e.id == localSlot);
 
-  /// The opponent hero's render entity (interpolated). Always present.
+  /// The opponent hero's render entity (interpolated). Always present (heroes
+  /// respawn rather than despawn).
   RenderEntity get opponent => entities.firstWhere((e) => e.id == 1 - localSlot);
 }
