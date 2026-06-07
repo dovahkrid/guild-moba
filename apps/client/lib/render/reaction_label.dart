@@ -3,7 +3,8 @@ import 'package:flutter/painting.dart'; // Flame's TextPaint needs Flutter's Tex
 import 'package:sim/sim.dart' show kOne;
 
 /// Pop-text for a reaction. A flat field-overlap reaction (multiplierRaw == 0)
-/// shows no multiplier; an attack-amplify reaction shows "x1.3". (Reaction is
+/// shows no multiplier; an attack-amplify reaction shows the multiplier to one
+/// decimal place (e.g. "x1.3" for ×kVaporizeMult). (Reaction is
 /// Vaporize-only in the slice; the param is kept for forward labels.)
 String reactionText(int reaction, int multiplierRaw) {
   if (multiplierRaw == 0) return 'VAPORIZE';
