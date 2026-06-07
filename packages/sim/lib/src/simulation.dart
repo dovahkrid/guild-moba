@@ -105,7 +105,7 @@ class Simulation {
     for (final it in ordered) {
       if (it.playerSlot < 0 || it.playerSlot >= 2) continue;
       final hero = _byId[it.playerSlot]!;
-      if (hero.respawnTimer != 0) continue; // downed: ignore input
+      if (hero.respawnTimer != 0 || hero.hp.raw <= 0) continue; // downed (incl. dropped to 0 by a same-tick burst): ignore input
       if (it.type == IntentType.move) {
         hero.target = FVec2(Fixed.raw(it.aimX), Fixed.raw(it.aimY));
         hero.attackTargetId = -1;

@@ -411,4 +411,20 @@ void main() {
     final events = sim.step(0, const [Intent(playerSlot: 0, type: IntentType.attack, aimX: 1, seq: 1)]);
     expect(events.whereType<ReactionTriggered>(), hasLength(1)); // field reacts; the auto is ICD-blocked
   });
+
+  test('a hero downed by a same-tick cast burst does not cast back (no corpse cast)', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final h0 = sim.entity(0)..pos = FVec2(Fixed.zero, Fixed.fromInt(7)); // Pyro, casts first (lower seq)
+    h0.target = h0.pos;
+    final h1 = sim.entity(1)..pos = FVec2(Fixed.fromNum(1), Fixed.fromInt(7)); // in h0's burst radius
+    h1.target = h1.pos;
+    h1.hp = Fixed.fromNum(5); // < kCastBurstDamage (10) → downed by h0's burst this tick
+    sim.step(0, const [
+      Intent(playerSlot: 0, type: IntentType.ability, aimX: 0, aimY: 458752, seq: 1),
+      Intent(playerSlot: 1, type: IntentType.ability, aimX: 0, aimY: 458752, seq: 2),
+    ]);
+    expect(h1.hp.raw, lessThanOrEqualTo(0)); // h0's burst downed h1 in phase 1
+    expect(sim.fields.where((f) => f.ownerId == 1), isEmpty); // the corpse did NOT place a field / cast back
+    expect(sim.fields.where((f) => f.ownerId == 0), hasLength(1)); // h0's own cast still happened
+  });
 }
