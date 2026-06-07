@@ -37,4 +37,16 @@ void main() {
     expect(() => heroElement(2), throwsA(isA<AssertionError>()));
     expect(() => heroPlacesAtSelf(-1), throwsA(isA<AssertionError>()));
   });
+
+  test('v2 damage constants obey the Fixed budget (flat + amplifiable burst)', () {
+    for (final f in <Fixed>[kCastBurstDamage, kReactionFlatDamage]) {
+      expect(f.toDouble().abs() < 32768, isTrue, reason: '$f exceeds the Fixed budget');
+    }
+    // The cast burst CAN be amplified by a reaction, so burst × mult must fit.
+    expect((kCastBurstDamage * kVaporizeMult).toDouble().abs() < 32768, isTrue);
+    // The field-overlap reaction is FLAT (never amplified) but must still fit.
+    expect(kReactionFlatDamage.toDouble().abs() < 32768, isTrue);
+    expect(kCastBurstDamage.toDouble(), greaterThan(0));
+    expect(kReactionFlatDamage.toDouble(), greaterThan(0));
+  });
 }

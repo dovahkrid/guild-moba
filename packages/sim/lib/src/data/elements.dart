@@ -11,12 +11,21 @@ const int kReactionIcdTicks = 15; // ~0.5s per-unit reaction internal cooldown
 // --- Vaporize (amplify; spec §3.3 committed field-cap multiplier) ---
 final Fixed kVaporizeMult = Fixed.fromNum(1.3);
 
-// --- Neutral fields ---
+// --- Neutral fields (coat-only; no DoT in v2) ---
 final Fixed kFieldRadius = Fixed.fromNum(2.5);
 final Fixed kFieldRadiusSq = Fixed.fromNum(2.5 * 2.5); // compare vs lengthSq, no sqrt
-final Fixed kFieldDotDamage = Fixed.fromNum(1); // per-tick DoT to HEROES (zero to creeps)
+final Fixed kFieldDotDamage = Fixed.fromNum(1); // DEPRECATED (Plan 4 DoT); removed in Plan 5 Task 2
 const int kFieldDurationTicks = 120; // ~4s
 const int kAbilityCooldownTicks = 240; // ~8s (> field duration → ≤1 active field/hero)
+
+// --- Plan 5 damage model (v2) ---
+// A one-time, enemy-only AoE dealt on cast, centered on the field. May be
+// amplified by an attack-amplify reaction → kCastBurstDamage × kVaporizeMult must
+// stay in the Fixed budget.
+final Fixed kCastBurstDamage = Fixed.fromNum(10);
+// Flat damage from a field-overlap reaction (no triggering hit to amplify);
+// dealt only to an ENEMY of the field owner (owner/own-team take 0).
+final Fixed kReactionFlatDamage = Fixed.fromNum(8);
 
 // --- Slice roster (data) ---
 // hero 0 = Cinderfang (Pyro, Ember Field placed at his own position);
