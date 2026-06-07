@@ -68,4 +68,16 @@ void main() {
     expect(t1.where((i) => i.type == IntentType.ability), isEmpty); // ability gone
     expect(b.lastAckedSeq[0], 2); // both inputs acked
   });
+
+  test('clearSlot drops the held move/attack AND any pending ability for that slot only', () {
+    final b = IntentBuffer();
+    b.accept(input(0, 1, aimX: 100)); // held move on slot 0
+    b.accept(InputMsg(
+        slot: 0, seq: 2, clientTick: 0, aimX: 5, aimY: 0, type: IntentType.ability.index));
+    b.accept(input(1, 1, aimX: 200)); // held move on slot 1
+    b.clearSlot(0);
+    final out = b.drainForTick();
+    expect(out.where((i) => i.playerSlot == 0), isEmpty); // slot 0 fully cleared
+    expect(out.where((i) => i.playerSlot == 1), hasLength(1)); // slot 1 untouched
+  });
 }

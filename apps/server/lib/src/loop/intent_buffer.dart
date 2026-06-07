@@ -34,6 +34,14 @@ class IntentBuffer {
     return true;
   }
 
+  /// Plan 6: drop a slot's held move/attack and any pending one-shot ability.
+  /// Called when a hero is downed so a respawn does not resume the old order.
+  void clearSlot(int slot) {
+    if (slot < 0 || slot > 1) return;
+    _held[slot] = null;
+    _pendingAbility[slot] = null;
+  }
+
   /// The intents to apply this tick: held move/attack (NOT cleared) + any pending
   /// one-shot ability (cleared after this drain). The sim re-sorts by
   /// (playerSlot, seq), so append order here is not load-bearing.
