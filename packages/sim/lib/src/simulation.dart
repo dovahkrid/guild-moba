@@ -244,8 +244,9 @@ class Simulation {
     }
   }
 
-  /// Credit gold to a hero by id (no-op if the killer isn't a live hero, e.g. a
-  /// tower last-hit a creep). Gold is a plain int running total.
+  /// Credit gold to a hero by id (no-op if the killer isn't a hero, e.g. a
+  /// tower last-hit a creep). A hero downed on its kill tick still earns —
+  /// gold is a plain int running total that survives respawn. Intentional.
   void _creditGold(int heroId, int amount) {
     final e = _byId[heroId];
     if (e != null && e.kind == EntityKind.hero) e.gold += amount;
