@@ -181,7 +181,8 @@ void main() {
     h0.hp = Fixed.zero;
     h0.pos = const FVec2(Fixed.zero, Fixed.zero);
     final h1 = sim.entity(1);
-    // Place h1 at y=7 to stay clear of all towers (tower range 6 along x).
+    // Place h1 off-lane at y=7 so it sits outside every tower's 2D range
+    // (towers at x=±4/±10, range 6) — isolates the downed-hero behavior.
     h1.pos = FVec2(Fixed.fromInt(1), Fixed.fromInt(7));
     h1.target = h1.pos;
     sim.step(0, const []);

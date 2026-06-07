@@ -158,8 +158,7 @@ class Simulation {
       e.respawnTimer -= 1;
       if (e.respawnTimer == 0) {
         e.hp = e.maxHp;
-        final spawnX = e.teamId == 0 ? kHero0SpawnX : kHero1SpawnX;
-        e.pos = FVec2(spawnX, Fixed.zero);
+        e.pos = FVec2(_heroSpawnX(e), Fixed.zero);
         e.target = e.pos;
         e.attackCooldown = 0;
       }
@@ -200,11 +199,13 @@ class Simulation {
       if (e.kind != EntityKind.hero || e.respawnTimer != 0) continue;
       if (e.hp.raw > 0) continue;
       e.respawnTimer = kHeroRespawnTicks;
-      final spawnX = e.teamId == 0 ? kHero0SpawnX : kHero1SpawnX;
-      e.pos = FVec2(spawnX, Fixed.zero); // park at base while downed
+      e.pos = FVec2(_heroSpawnX(e), Fixed.zero); // park at base while downed
       e.target = e.pos;
     }
   }
+
+  /// A hero's spawn x by team (team 0 negative side, team 1 positive side).
+  Fixed _heroSpawnX(Entity e) => e.teamId == 0 ? kHero0SpawnX : kHero1SpawnX;
 
   Entity? _acquireTowerTarget(Entity tower) {
     Entity? best;
