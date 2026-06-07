@@ -128,7 +128,9 @@ class Simulation {
       );
     }
 
-    // 2b. Spawn the periodic neutral creep wave (deterministic, idempotent).
+    // 3b. Spawn the periodic neutral creep wave (deterministic, idempotent).
+    //     Runs after movement, before combat, so a freshly spawned wave is
+    //     placed before _stepCombat can target it this tick.
     _maybeSpawnWave(currentTick);
 
     // 4. Combat: cooldowns + instantaneous damage (heroes hit only their lock).
@@ -423,7 +425,8 @@ class Simulation {
       var e = _byId[id];
       if (e == null) {
         // Present on the authority but not locally — spawn it (id/kind/team
-        // are immutable, so set via constructor).
+        // are immutable, so set via constructor; pos/hp/maxHp here are
+        // overwritten by the unconditional apply block below).
         e = Entity(
           id: id,
           kind: EntityKind.values[kindIndex],
