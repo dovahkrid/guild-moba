@@ -103,6 +103,20 @@ class MatchController {
         type: IntentType.ability.index);
   }
 
+  /// Plan 6: once the local hero is downed, drop any HELD (move/attack) order from
+  /// the pending log so a stale order cannot re-feed after respawn. (The server
+  /// cancels the held order unconditionally on death; an order the client issued
+  /// in the death-latency window is dropped server-side WITHOUT an ack, so it would
+  /// otherwise sit in `_pending` forever.) Abilities are one-shot — they only fire
+  /// on their issuing clientTick, never re-feed — so they are left intact.
+  /// Reconcile-safe: the reconcile re-step window is always far newer than a
+  /// 150-tick-old death, so these pruned pre-death orders are never re-stepped.
+  void _dropHeldWhileLocalDowned() {
+    if (_predicted.entity(localSlot).isDowned) {
+      _pending.removeWhere((p) => p.intent.type != IntentType.ability);
+    }
+  }
+
   /// The local intents to apply at client tick [t]: the held move/attack (latest
   /// pending with clientTick <= t, last-writer-wins) PLUS any one-shot ability
   /// whose clientTick == t. Abilities are edge-triggered (fire once on their
@@ -142,6 +156,7 @@ class MatchController {
       ));
     }
     _nextTick++;
+    _dropHeldWhileLocalDowned();
   }
 
   /// Drain reactions collected since the last call (host spawns pop-text once per
@@ -187,6 +202,7 @@ class MatchController {
     final after = _predicted.entity(localSlot).pos;
     _lastCorrectionDist = (after - before).length().toDouble();
     _lastReconciledServerTick = snap.serverTick;
+    _dropHeldWhileLocalDowned();
   }
 
   /// Render view (host calls per frame). Opponent hero interpolated ~100ms

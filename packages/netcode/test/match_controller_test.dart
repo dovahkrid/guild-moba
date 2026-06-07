@@ -165,6 +165,27 @@ void main() {
     expect(c.debugLocalPos().x.raw, kHero0SpawnX.raw); // stood at spawn, never walked
   });
 
+  test('Plan 6: an unacked death-window order does not re-feed after respawn (no rubber-band)', () {
+    final c = _ctrl(slot: 0);
+    // The player clicks a move while the client still predicts the hero ALIVE,
+    // so input-gating does not fire and the order (seq 1) is recorded + "sent".
+    expect(c.applyLocalInput(655360, 0), isNotNull); // move right, recorded in _pending
+    c.advanceClientTick(); // predicts the move; _nextTick = 1
+    // Authoritative truth: the hero was already downed at tick 0, and the server
+    // DROPPED that input (downed-slot guard) so it is NEVER acked (ackedSeq stays 0).
+    final server = Simulation.create(const SimConfig(seed: 1337));
+    server.entity(0).hp = Fixed.zero;
+    server.step(0, const []); // downs hero 0
+    c.onServerSnapshot(SnapshotMsg(
+        serverTick: 0, ackedSeq: const [0, 0], stateBytes: server.snapshotBytes()));
+    // Predict forward through respawn with no further reconcile (worst case for drift).
+    for (var t = 1; t <= kHeroRespawnTicks + 5; t++) {
+      c.advanceClientTick();
+    }
+    // The trapped order must have been dropped on downing -> hero stands at spawn.
+    expect(c.debugLocalPos().x.raw, kHero0SpawnX.raw);
+  });
+
   test('reconcile reproduces a SINGLE cast (no re-fire): exact hash match', () {
     final server = Simulation.create(const SimConfig(seed: 1337));
     final c = MatchController(seed: 1337, localSlot: 0, startTick: 0);
