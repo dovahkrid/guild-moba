@@ -23,6 +23,7 @@ class MatchController {
   final List<_Pending> _pending = []; // ordered by clientTick
   int _lastReconciledServerTick = -1;
   double _lastCorrectionDist = 0.0;
+  final List<RenderReaction> _recentReactions = []; // collected each advanceClientTick
 
   MatchController({required int seed, required this.localSlot, required int startTick})
       : _predicted = Simulation.create(SimConfig(seed: seed)),
@@ -77,6 +78,27 @@ class MatchController {
         type: IntentType.attack.index);
   }
 
+  /// Record + apply a local ABILITY cast at world point (aimX,aimY) (Q16.16 raw);
+  /// returns the InputMsg to send. Mirrors applyLocalInput with IntentType.ability.
+  InputMsg applyAbilityInput(int aimX, int aimY) {
+    final seq = ++_localSeq;
+    final intent = Intent(
+        playerSlot: localSlot,
+        type: IntentType.ability,
+        aimX: aimX,
+        aimY: aimY,
+        seq: seq,
+        clientTick: _nextTick);
+    _pending.add(_Pending(_nextTick, intent));
+    return InputMsg(
+        slot: localSlot,
+        seq: seq,
+        clientTick: _nextTick,
+        aimX: aimX,
+        aimY: aimY,
+        type: IntentType.ability.index);
+  }
+
   /// The held local intent in effect at tick [t] = latest pending with clientTick <= t.
   Intent? _heldAt(int t) {
     Intent? held;
@@ -90,11 +112,34 @@ class MatchController {
     return held;
   }
 
-  /// Advance the predicted sim one tick (host calls at 30Hz).
+  /// Advance the predicted sim one tick (host calls at 30Hz). Collects reactions
+  /// fired this tick (forward prediction only — reconcile re-steps do NOT collect,
+  /// so a predicted reaction surfaces exactly once).
   void advanceClientTick() {
     final held = _heldAt(_nextTick);
-    _predicted.step(_nextTick, held == null ? const [] : [held]);
+    final events = _predicted.step(_nextTick, held == null ? const [] : [held]);
+    for (final e in events) {
+      if (e is! ReactionTriggered) continue;
+      final present = _predicted.entityIdsSorted.contains(e.unitId);
+      final pos = present ? _predicted.entity(e.unitId).pos : null;
+      _recentReactions.add(RenderReaction(
+        x: pos?.x.toDouble() ?? 0,
+        y: pos?.y.toDouble() ?? 0,
+        reaction: e.reaction,
+        multiplierRaw: e.multiplierRaw,
+      ));
+    }
     _nextTick++;
+  }
+
+  /// Drain reactions collected since the last call (host spawns pop-text once per
+  /// frame). Separate from update() because view/update() is read multiple times
+  /// per frame; a side-effecting drain there would drop pop-texts.
+  List<RenderReaction> drainReactions() {
+    if (_recentReactions.isEmpty) return const [];
+    final out = List<RenderReaction>.of(_recentReactions);
+    _recentReactions.clear();
+    return out;
   }
 
   /// Reconcile to an authoritative snapshot.
@@ -156,8 +201,19 @@ class MatchController {
         y: y,
         hp: e.hp.toDouble(),
         maxHp: e.maxHp.toDouble(),
+        statusElement: e.statusElement,
       ));
     }
+    final fields = <RenderField>[
+      for (final f in _predicted.fields)
+        RenderField(
+          ownerId: f.ownerId,
+          x: f.center.x.toDouble(),
+          y: f.center.y.toDouble(),
+          element: f.element,
+          radius: kFieldRadius.toDouble(),
+        ),
+    ];
     return MatchView(
       entities: entities,
       localSlot: localSlot,
@@ -166,6 +222,7 @@ class MatchController {
       lastServerTick: _lastReconciledServerTick,
       pendingInputCount: _pending.length,
       lastCorrectionDist: _lastCorrectionDist,
+      fields: fields,
     );
   }
 }
