@@ -1,5 +1,7 @@
 import 'package:flame/game.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show BrowserContextMenu;
 
 import 'app_config.dart';
 import 'match/match_binding.dart';
@@ -10,7 +12,14 @@ import 'ui/dev_panel.dart';
 import 'ui/hud_overlay.dart';
 import 'ui/result_overlay.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Right-click drives gameplay (LoL controls), so suppress the browser's
+  // native context menu on web.
+  if (kIsWeb) {
+    await BrowserContextMenu.disableContextMenu();
+  }
+
   const config = ClientConfig();
 
   final wsTransport = WebSocketChannelTransport(Uri.parse(config.wsUrl));

@@ -65,7 +65,16 @@ class MatchBinding {
 
   /// Advance by [dtMs] of real time: accumulate and step the predicted sim at
   /// a fixed 30 Hz; advance the render clock for interpolation.
+  ///
+  /// A backgrounded browser tab throttles its frame loop, so on refocus the
+  /// first frame can carry a multi-second [dtMs]. Cap it so we don't run a
+  /// catch-up storm of prediction steps (a "spiral of death"): the predicted
+  /// clock simply resumes slightly behind real time, and the next server
+  /// snapshot re-anchors it via reconcile (which runs independently of this
+  /// loop, off the WebSocket).
+  static const int _maxFrameMs = 100; // at most ~3 catch-up ticks per frame
   void tick(int dtMs) {
+    if (dtMs > _maxFrameMs) dtMs = _maxFrameMs;
     _renderTimeMs += dtMs;
     if (_ended) return;
     _accMs += dtMs;

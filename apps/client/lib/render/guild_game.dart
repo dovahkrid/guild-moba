@@ -11,7 +11,7 @@ import 'world_backdrop.dart';
 
 /// The Flame game. Renders MatchView's entity list as colored shapes; holds ZERO
 /// gameplay truth. Spawns/despawns EntityViews via an id-keyed diff each frame.
-class GuildGame extends FlameGame with TapCallbacks {
+class GuildGame extends FlameGame with SecondaryTapCallbacks {
   GuildGame(this.binding);
 
   final MatchBinding binding;
@@ -55,11 +55,11 @@ class GuildGame extends FlameGame with TapCallbacks {
     }
   }
 
-  /// LoL right-click semantics: clicking ON an enemy locks an attack onto it;
-  /// clicking the ground issues a move (which clears any lock). (The web build
-  /// maps the single tap to "right-click"; left-click selection is not modeled.)
+  /// LoL right-click semantics: right-clicking ON an enemy locks an attack onto
+  /// it; right-clicking the ground issues a move (which clears any lock).
+  /// Left-click is unused (selection is not modeled).
   @override
-  void onTapUp(TapUpEvent event) {
+  void onSecondaryTapUp(SecondaryTapUpEvent event) {
     final worldPos = camera.globalToLocal(event.canvasPosition);
     final wx = flameToWorld(worldPos.x);
     final wy = flameToWorld(worldPos.y);
