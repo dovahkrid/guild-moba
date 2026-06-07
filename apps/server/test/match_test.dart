@@ -116,7 +116,7 @@ void main() {
     sim.entity(1).hp = Fixed.zero;
     driver.pump(1); // death tick → HeroDowned → clearSlot(1)
     expect(sim.entity(1).respawnTimer, kHeroRespawnTicks);
-    driver.pump(kHeroRespawnTicks); // run out the timer
+    driver.pump(kHeroRespawnTicks + 5); // run out the timer + a few ticks so any surviving order would re-feed and move the hero
     expect(sim.entity(1).respawnTimer, 0);
     expect(sim.entity(1).pos.x.raw, kHero1SpawnX.raw); // stood at spawn (held order cancelled)
   });
@@ -139,7 +139,7 @@ void main() {
     // While downed, hero 1 clicks a move far away — must be IGNORED.
     p1.receive(ProtocolCodec.encode(const InputMsg(
         slot: 1, seq: 1, clientTick: 0, aimX: -1310720, aimY: 0, type: 1)));
-    driver.pump(kHeroRespawnTicks);
+    driver.pump(kHeroRespawnTicks + 5); // run out the timer + a few ticks so any surviving order would re-feed and move the hero
     expect(sim.entity(1).respawnTimer, 0);
     expect(sim.entity(1).pos.x.raw, kHero1SpawnX.raw); // stood still: the downed click was dropped
   });
