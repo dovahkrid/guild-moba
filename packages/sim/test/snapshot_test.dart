@@ -51,7 +51,7 @@ void main() {
   });
 
   test('canonicalBytes/hash unchanged (golden untouched)', () {
-    expect(_run(300).canonicalStateHash(), 0xa14ee38d);
+    expect(_run(300).canonicalStateHash(), 0x0fbfb7ac);
   });
 
   test('snapshot round-trips combat fields (gold, cooldown, respawn, maxHp, winnerTeam)', () {
@@ -69,6 +69,21 @@ void main() {
     expect(dst.entity(1).respawnTimer, 13);
     expect(dst.entity(0).maxHp.raw, src.entity(0).maxHp.raw);
     expect(dst.entity(2).maxHp.raw, src.entity(2).maxHp.raw); // wanderer maxHp=50 round-trips
+    expect(dst.canonicalStateHash(), src.canonicalStateHash());
+  });
+
+  test('snapshot round-trips elemental status/ability fields', () {
+    final src = Simulation.create(const SimConfig(seed: 1337));
+    src.entity(0).statusElement = Element.hydro.index;
+    src.entity(0).statusTimer = 20;
+    src.entity(0).reactionIcd = 7;
+    src.entity(0).abilityCooldown = 33;
+    final dst = Simulation.create(const SimConfig(seed: 1337))
+      ..restoreFromSnapshot(src.snapshotBytes());
+    expect(dst.entity(0).statusElement, Element.hydro.index);
+    expect(dst.entity(0).statusTimer, 20);
+    expect(dst.entity(0).reactionIcd, 7);
+    expect(dst.entity(0).abilityCooldown, 33);
     expect(dst.canonicalStateHash(), src.canonicalStateHash());
   });
 }

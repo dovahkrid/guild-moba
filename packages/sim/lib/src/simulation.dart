@@ -5,18 +5,19 @@ import 'events.dart';
 import 'math/det_rng.dart';
 import 'math/fixed.dart';
 import 'math/fvec2.dart';
+import 'model/elemental_field.dart';
 import 'model/entity.dart';
 import 'model/intent.dart';
 import 'model/sim_config.dart';
 import 'state/byte_writer.dart';
 
 /// Version of the canonicalBytes() determinism format (the replay-golden hash).
-const int kSchemaVersion = 2;
+const int kSchemaVersion = 3;
 
 /// Version of the snapshotBytes() netcode format (superset incl. Entity.target).
 /// Independent from kSchemaVersion so the determinism golden never moves when
 /// the wire format evolves.
-const int kSnapshotVersion = 2;
+const int kSnapshotVersion = 3;
 
 /// Stable entity id for the wanderer NPC (created in [Simulation.create]).
 const int kWandererEntityId = 2;
@@ -46,6 +47,12 @@ class Simulation {
   // _stepCombat), so it never needs to survive a snapshot. Keeps byte layout
   // unchanged.
   final Map<int, int> _lastDamager = {};
+
+  /// Stationary neutral elemental fields (Plan 4). Tiny (≤1 active per hero,
+  /// cooldown-gated). Serialized after the entity loop. Iterated in list order
+  /// (deterministic: append on cast, removal preserves order).
+  final List<ElementalField> _fields = [];
+  List<ElementalField> get fields => _fields;
 
   Simulation._(this._rng, this._entities)
       : _byId = {for (final e in _entities) e.id: e};
@@ -377,7 +384,19 @@ class Simulation {
       w.i32(e.gold);
       w.i32(e.respawnTimer);
       w.i32(e.attackTargetId);
+      w.i32(e.statusElement);
+      w.i32(e.statusTimer);
+      w.i32(e.reactionIcd);
+      w.i32(e.abilityCooldown);
       // NOTE: target is intentionally NOT in the canonical format (snapshot-only).
+    }
+    w.i32(_fields.length);
+    for (final f in _fields) {
+      w.i32(f.ownerId);
+      w.fixed(f.center.x);
+      w.fixed(f.center.y);
+      w.i32(f.element);
+      w.i32(f.timer);
     }
     return w.toBytes();
   }
@@ -412,8 +431,20 @@ class Simulation {
       w.i32(e.gold);
       w.i32(e.respawnTimer);
       w.i32(e.attackTargetId);
+      w.i32(e.statusElement);
+      w.i32(e.statusTimer);
+      w.i32(e.reactionIcd);
+      w.i32(e.abilityCooldown);
       w.fixed(e.target.x);
       w.fixed(e.target.y);
+    }
+    w.i32(_fields.length);
+    for (final f in _fields) {
+      w.i32(f.ownerId);
+      w.fixed(f.center.x);
+      w.fixed(f.center.y);
+      w.i32(f.element);
+      w.i32(f.timer);
     }
     return w.toBytes();
   }
@@ -451,6 +482,10 @@ class Simulation {
       final gold = r.i32();
       final respawn = r.i32();
       final attackTargetId = r.i32();
+      final statusElement = r.i32();
+      final statusTimer = r.i32();
+      final reactionIcd = r.i32();
+      final abilityCooldown = r.i32();
       final target = FVec2(r.fixed(), r.fixed());
       seen.add(id);
       var e = _byId[id];
@@ -477,11 +512,26 @@ class Simulation {
       e.gold = gold;
       e.respawnTimer = respawn;
       e.attackTargetId = attackTargetId;
+      e.statusElement = statusElement;
+      e.statusTimer = statusTimer;
+      e.reactionIcd = reactionIcd;
+      e.abilityCooldown = abilityCooldown;
       e.target = target;
     }
     // Drop entities absent from the snapshot (despawned on the authority).
     _entities.removeWhere((e) => !seen.contains(e.id));
     _byId.removeWhere((id, e) => !seen.contains(id));
+    final fieldCount = r.i32();
+    _fields.clear();
+    for (var i = 0; i < fieldCount; i++) {
+      final ownerId = r.i32();
+      final cx = r.fixed();
+      final cy = r.fixed();
+      final element = r.i32();
+      final timer = r.i32();
+      _fields.add(ElementalField(
+          ownerId: ownerId, center: FVec2(cx, cy), element: element, timer: timer));
+    }
     _lastDamager.clear();
   }
 
@@ -507,6 +557,10 @@ class Simulation {
       r.i32(); // gold
       r.i32(); // respawnTimer
       r.i32(); // attackTargetId
+      r.i32(); // statusElement
+      r.i32(); // statusTimer
+      r.i32(); // reactionIcd
+      r.i32(); // abilityCooldown
       r.fixed(); r.fixed(); // target
       if (eid == id) return pos;
     }
