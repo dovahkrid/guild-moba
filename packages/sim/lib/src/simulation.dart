@@ -451,8 +451,10 @@ class Simulation {
 
   /// Overwrite this sim's entire state from snapshotBytes(). Reuses the existing
   /// Entity instances (ids are stable from create()). FVec2 is immutable, so we
-  /// reassign the mutable fields: pos/vel/target plus
-  /// hp/maxHp and the int combat fields (attackCooldown/gold/respawnTimer/attackTargetId).
+  /// reassign the mutable fields: pos/vel/target plus hp/maxHp and the int
+  /// combat/elemental fields (attackCooldown/gold/respawnTimer/attackTargetId/
+  /// statusElement/statusTimer/reactionIcd/abilityCooldown). Also rebuilds the
+  /// stationary elemental field list (_fields).
   void restoreFromSnapshot(Uint8List bytes) {
     final r = ByteReader(bytes);
     final version = r.i32();
