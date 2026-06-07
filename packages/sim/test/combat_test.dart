@@ -293,14 +293,14 @@ void main() {
     // Hero 0 right-clicks (locks) the core. The hp-0 towers are swept on tick 0;
     // the lock re-applies each tick and the core dies once it becomes vulnerable.
     const lockCore = Intent(playerSlot: 0, type: IntentType.attack, aimX: kCore1Id, seq: 1);
-    SimEvent? core;
+    CoreDestroyed? core;
     for (var t = 0; t < 5 && sim.winnerTeam == -1; t++) {
       for (final e in sim.step(t, const [lockCore])) {
         if (e is CoreDestroyed) core = e;
       }
     }
     expect(sim.winnerTeam, 0); // team 0 destroyed team 1's core
-    expect((core! as CoreDestroyed).teamId, 1);
+    expect(core!.teamId, 1);
     expect(sim.entityIdsSorted.contains(kCore1Id), isFalse);
   });
 }

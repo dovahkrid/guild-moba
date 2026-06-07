@@ -44,6 +44,6 @@ class SnapshotMsg extends Msg {
 
 class MatchEndMsg extends Msg {
   final EndReason reason;
-  final int winnerSlot; // -1 when not applicable (e.g. opponentLeft)
+  final int winnerSlot; // slot of the winning player; -1 unless reason == coreDestroyed
   const MatchEndMsg({required this.reason, this.winnerSlot = -1});
 }

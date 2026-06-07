@@ -70,7 +70,8 @@ class Match {
     final intents = _buffer.drainForTick();
     _sim.step(_currentTick, intents);
     if (_sim.winnerTeam != -1) {
-      _endWithWin(_sim.winnerTeam); // teamId == slot in 1v1
+      // Ends before incrementing _currentTick; the terminal snapshot is tick N.
+      _endWithWin(_sim.winnerTeam);
       return;
     }
     if (shouldSnapshot(_currentTick)) {
@@ -86,10 +87,12 @@ class Match {
     _currentTick++;
   }
 
-  void _endWithWin(int winnerSlot) {
+  void _endWithWin(int winnerTeam) {
     if (ended) return;
     ended = true;
     _driver.stop();
+    // 1v1: teamId == slot. A future 2v2 would map team -> slot here.
+    final winnerSlot = winnerTeam;
     final snap = ProtocolCodec.encode(SnapshotMsg(
       serverTick: _currentTick,
       ackedSeq: [_buffer.lastAckedSeq[0], _buffer.lastAckedSeq[1]],
