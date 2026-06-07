@@ -50,7 +50,7 @@ void main() {
   });
 
   test('canonicalBytes/hash unchanged (golden untouched)', () {
-    expect(_run(300).canonicalStateHash(), 0xbab1ed9a);
+    expect(_run(300).canonicalStateHash(), 0xa14ee38d);
   });
 
   test('snapshot round-trips combat fields (gold, cooldown, respawn, maxHp, winnerTeam)', () {

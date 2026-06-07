@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
-// ignore: unused_import
-import 'data/combat.dart'; // used in Task 4 (create())
+import 'data/combat.dart';
 import 'math/det_rng.dart';
 import 'math/fixed.dart';
 import 'math/fvec2.dart';
@@ -45,27 +44,27 @@ class Simulation {
 
   factory Simulation.create(SimConfig config) {
     final entities = <Entity>[
-      Entity(
-        id: 0,
-        kind: EntityKind.hero,
-        teamId: 0,
-        pos: FVec2(Fixed.fromInt(-8), Fixed.zero),
-        hp: Fixed.fromInt(100),
-      ),
-      Entity(
-        id: 1,
-        kind: EntityKind.hero,
-        teamId: 1,
-        pos: FVec2(Fixed.fromInt(8), Fixed.zero),
-        hp: Fixed.fromInt(100),
-      ),
-      Entity(
-        id: kWandererEntityId,
-        kind: EntityKind.wanderer,
-        teamId: 2,
-        pos: FVec2.zero,
-        hp: Fixed.fromInt(50),
-      ),
+      Entity(id: 0, kind: EntityKind.hero, teamId: 0,
+          pos: FVec2(kHero0SpawnX, Fixed.zero), hp: kHeroMaxHp, maxHp: kHeroMaxHp),
+      Entity(id: 1, kind: EntityKind.hero, teamId: 1,
+          pos: FVec2(kHero1SpawnX, Fixed.zero), hp: kHeroMaxHp, maxHp: kHeroMaxHp),
+      Entity(id: kWandererEntityId, kind: EntityKind.wanderer, teamId: 2,
+          pos: FVec2.zero, hp: Fixed.fromInt(50), maxHp: Fixed.fromInt(50)),
+      // Cores (back of each side; vulnerable only after both same-team towers fall).
+      Entity(id: kCore0Id, kind: EntityKind.core, teamId: 0,
+          pos: FVec2(-kCoreX, Fixed.zero), hp: kCoreMaxHp, maxHp: kCoreMaxHp),
+      Entity(id: kCore1Id, kind: EntityKind.core, teamId: 1,
+          pos: FVec2(kCoreX, Fixed.zero), hp: kCoreMaxHp, maxHp: kCoreMaxHp),
+      // Outer towers (throat, nearer center).
+      Entity(id: kOuterTower0Id, kind: EntityKind.tower, teamId: 0,
+          pos: FVec2(-kOuterTowerX, Fixed.zero), hp: kOuterTowerMaxHp, maxHp: kOuterTowerMaxHp),
+      Entity(id: kOuterTower1Id, kind: EntityKind.tower, teamId: 1,
+          pos: FVec2(kOuterTowerX, Fixed.zero), hp: kOuterTowerMaxHp, maxHp: kOuterTowerMaxHp),
+      // Inner towers (base mouth).
+      Entity(id: kInnerTower0Id, kind: EntityKind.tower, teamId: 0,
+          pos: FVec2(-kInnerTowerX, Fixed.zero), hp: kInnerTowerMaxHp, maxHp: kInnerTowerMaxHp),
+      Entity(id: kInnerTower1Id, kind: EntityKind.tower, teamId: 1,
+          pos: FVec2(kInnerTowerX, Fixed.zero), hp: kInnerTowerMaxHp, maxHp: kInnerTowerMaxHp),
     ];
     return Simulation._(DetRng.fromInt(config.seed), entities);
   }

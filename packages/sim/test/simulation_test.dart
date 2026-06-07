@@ -1,12 +1,14 @@
-import 'package:sim/src/model/intent.dart';
-import 'package:sim/src/model/sim_config.dart';
-import 'package:sim/src/simulation.dart';
+import 'package:sim/sim.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('starts with two heroes and one wanderer in id order', () {
+  test('starts with heroes, wanderer, cores and towers in id order', () {
     final sim = Simulation.create(const SimConfig(seed: 1337));
-    expect(sim.entityIdsSorted, [0, 1, 2]);
+    expect(sim.entityIdsSorted, [0, 1, 2, 10, 11, 12, 13, 14, 15]);
+    expect(sim.entity(10).kind, EntityKind.core);
+    expect(sim.entity(12).kind, EntityKind.tower);
+    expect(sim.entity(10).teamId, 0);
+    expect(sim.entity(11).teamId, 1);
   });
 
   test('a move intent pulls the hero toward its aim over ticks', () {
@@ -54,6 +56,6 @@ void main() {
     for (var t = 0; t < 300; t++) {
       s.step(t, [m0, m1]);
     }
-    expect(s.canonicalStateHash(), 0xbab1ed9a);
+    expect(s.canonicalStateHash(), 0xa14ee38d);
   });
 }
