@@ -47,9 +47,16 @@ class CoreDestroyed extends SimEvent {
 
 // --- Declared for Plan 4+ (NOT emitted in Plan 3). ---
 class ReactionTriggered extends SimEvent {
-  final int unitId;
-  final int reaction; // enum index, defined in Plan 4
-  const ReactionTriggered({required this.unitId, required this.reaction});
+  final int unitId; // who carried the consumed status (the reaction lands here)
+  final int reaction; // Reaction.index
+  final int multiplierRaw; // Q16.16 raw of the applied multiplier (e.g. ×1.3)
+  final int sourceId; // who landed the triggering hit
+  const ReactionTriggered({
+    required this.unitId,
+    required this.reaction,
+    required this.multiplierRaw,
+    required this.sourceId,
+  });
 }
 
 class BossSpawned extends SimEvent {

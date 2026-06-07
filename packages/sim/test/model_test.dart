@@ -57,4 +57,13 @@ void main() {
     expect(IntentType.move.index, 1);
     expect(IntentType.attack.index, 2);
   });
+
+  test('Entity has elemental status fields defaulting to none/ready', () {
+    final e = Entity(id: 0, kind: EntityKind.hero, teamId: 0,
+        pos: FVec2.zero, hp: Fixed.fromInt(100));
+    expect(e.statusElement, -1); // -1 = no elemental status
+    expect(e.statusTimer, 0);
+    expect(e.reactionIcd, 0);
+    expect(e.abilityCooldown, 0);
+  });
 }

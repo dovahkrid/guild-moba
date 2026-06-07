@@ -34,6 +34,20 @@ class Entity {
   /// reproduces it.
   int attackTargetId;
 
+  /// Elemental status (Plan 4): the single element coating this unit.
+  /// -1 = none; else Element.index. Serialized (heroes/creeps only ever carry it).
+  int statusElement;
+
+  /// Ticks of elemental status remaining; at 0 the status is swept to -1.
+  int statusTimer;
+
+  /// Per-unit reaction internal-cooldown (ticks; 0 = ready). Gates Vaporize so
+  /// an overlap can't machine-gun reactions.
+  int reactionIcd;
+
+  /// Ticks until this hero's field ability is ready (0 = ready).
+  int abilityCooldown;
+
   // Heroes seek toward this point (set by a move intent / pursue resolution).
   FVec2 target;
 
@@ -48,6 +62,10 @@ class Entity {
     this.gold = 0,
     this.respawnTimer = 0,
     this.attackTargetId = -1,
+    this.statusElement = -1,
+    this.statusTimer = 0,
+    this.reactionIcd = 0,
+    this.abilityCooldown = 0,
     FVec2? vel,
     FVec2? target,
   })  : maxHp = maxHp ?? hp,
