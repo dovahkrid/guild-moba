@@ -129,7 +129,8 @@ void main() {
     }
     // Snapshot at tick 4 acks the cast (seq 1) → client prunes it; reconcile
     // restores the authoritative (single) field and re-steps 5..9 WITHOUT re-firing.
-    // Both server and client end at tick 9, so their canonical state must match.
+    // Both server and client have completed through tick 9 (nextTick = 10), so
+    // their canonical state must match.
     final snap = SnapshotMsg(serverTick: 4, ackedSeq: const [1, 0], stateBytes: snapBytes!);
     c.onServerSnapshot(snap);
     expect(c.debugHash(), server.canonicalStateHash()); // EXACT: cast applied once, not re-fired

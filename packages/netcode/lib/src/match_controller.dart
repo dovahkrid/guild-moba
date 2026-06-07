@@ -116,7 +116,7 @@ class MatchController {
         held = p.intent; // latest move/attack persists
       }
     }
-    if (held != null) out.add(held);
+    if (held != null) out.add(held); // order not load-bearing: the sim re-sorts intents by (playerSlot, seq)
     return out;
   }
 
