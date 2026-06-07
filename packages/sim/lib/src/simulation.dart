@@ -128,6 +128,9 @@ class Simulation {
       );
     }
 
+    // 2b. Spawn the periodic neutral creep wave (deterministic, idempotent).
+    _maybeSpawnWave(currentTick);
+
     // 4. Combat: cooldowns + instantaneous damage (heroes hit only their lock).
     _stepCombat(events);
 
@@ -149,6 +152,27 @@ class Simulation {
     if (diff > step) return cur + step;
     if (-diff > step) return cur - step;
     return target;
+  }
+
+  void _maybeSpawnWave(int currentTick) {
+    if (currentTick < kFirstWaveTick) return;
+    if ((currentTick - kFirstWaveTick) % kWaveIntervalTicks != 0) return;
+    final waveIndex = (currentTick - kFirstWaveTick) ~/ kWaveIntervalTicks;
+    for (var i = 0; i < kCreepsPerWave; i++) {
+      final id = kCreepIdBase + waveIndex * kCreepsPerWave + i;
+      if (_byId.containsKey(id)) continue; // idempotent across reconcile re-steps
+      final offset = kCreepSpawnSpacing * Fixed.fromInt(i - (kCreepsPerWave ~/ 2));
+      final e = Entity(
+        id: id,
+        kind: EntityKind.creep,
+        teamId: 2, // neutral
+        pos: FVec2(offset, Fixed.zero),
+        hp: kCreepMaxHp,
+        maxHp: kCreepMaxHp,
+      );
+      _entities.add(e);
+      _byId[id] = e;
+    }
   }
 
   void _stepCombat(List<SimEvent> events) {
@@ -381,26 +405,55 @@ class Simulation {
     _rng = DetRng.fromState(lo, hi);
     _winnerTeam = r.i32();
     final count = r.i32();
+    final seen = <int>{};
     for (var i = 0; i < count; i++) {
       final id = r.i32();
-      r.i32(); // kind.index (stable; advance cursor)
-      r.i32(); // teamId (stable)
-      final e = _byId[id]!;
-      e.pos = FVec2(r.fixed(), r.fixed());
-      e.vel = FVec2(r.fixed(), r.fixed());
-      e.hp = r.fixed();
-      e.maxHp = r.fixed();
-      e.attackCooldown = r.i32();
-      e.gold = r.i32();
-      e.respawnTimer = r.i32();
-      e.attackTargetId = r.i32();
-      e.target = FVec2(r.fixed(), r.fixed());
+      final kindIndex = r.i32();
+      final teamId = r.i32();
+      final pos = FVec2(r.fixed(), r.fixed());
+      final vel = FVec2(r.fixed(), r.fixed());
+      final hp = r.fixed();
+      final maxHp = r.fixed();
+      final cooldown = r.i32();
+      final gold = r.i32();
+      final respawn = r.i32();
+      final attackTargetId = r.i32();
+      final target = FVec2(r.fixed(), r.fixed());
+      seen.add(id);
+      var e = _byId[id];
+      if (e == null) {
+        // Present on the authority but not locally — spawn it (id/kind/team
+        // are immutable, so set via constructor).
+        e = Entity(
+          id: id,
+          kind: EntityKind.values[kindIndex],
+          teamId: teamId,
+          pos: pos,
+          hp: hp,
+          maxHp: maxHp,
+        );
+        _entities.add(e);
+        _byId[id] = e;
+      }
+      e.pos = pos;
+      e.vel = vel;
+      e.hp = hp;
+      e.maxHp = maxHp;
+      e.attackCooldown = cooldown;
+      e.gold = gold;
+      e.respawnTimer = respawn;
+      e.attackTargetId = attackTargetId;
+      e.target = target;
     }
+    // Drop entities absent from the snapshot (despawned on the authority).
+    _entities.removeWhere((e) => !seen.contains(e.id));
+    _byId.removeWhere((id, e) => !seen.contains(id));
+    _lastDamager.clear();
   }
 
   /// Decode just one entity's pos from snapshotBytes() (for the interpolation
   /// buffer) without allocating a Simulation.
-  static FVec2 peekEntityPos(Uint8List bytes, int id) {
+  static FVec2? peekEntityPos(Uint8List bytes, int id) {
     final r = ByteReader(bytes);
     r.i32(); // version
     r.i32(); // tick
@@ -423,6 +476,6 @@ class Simulation {
       r.fixed(); r.fixed(); // target
       if (eid == id) return pos;
     }
-    throw ArgumentError('entity $id not in snapshot');
+    return null; // not in snapshot (despawned / never spawned) — caller holds last
   }
 }

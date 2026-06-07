@@ -41,12 +41,13 @@ void main() {
     expect(dst.canonicalStateHash(), src.canonicalStateHash());
   });
 
-  test('peekEntityPos reads an entity pos from snapshot bytes', () {
+  test('peekEntityPos reads an entity pos from snapshot bytes; null if absent', () {
     final src = _run(60);
     final bytes = src.snapshotBytes();
-    final p1 = Simulation.peekEntityPos(bytes, 1);
+    final p1 = Simulation.peekEntityPos(bytes, 1)!;
     expect(p1.x.raw, src.entity(1).pos.x.raw);
     expect(p1.y.raw, src.entity(1).pos.y.raw);
+    expect(Simulation.peekEntityPos(bytes, 99999), isNull); // never spawned
   });
 
   test('canonicalBytes/hash unchanged (golden untouched)', () {

@@ -189,4 +189,31 @@ void main() {
     expect(h1.hp.raw, kHeroMaxHp.raw); // downed h0 dealt no damage
     expect(h0.hp.raw, 0); // untargetable: took none either (hp already 0)
   });
+
+  test('a creep wave spawns at the first-wave tick with deterministic ids', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    for (var t = 0; t <= kFirstWaveTick; t++) {
+      sim.step(t, const []);
+    }
+    final creepIds = sim.entityIdsSorted.where((id) => id >= kCreepIdBase).toList();
+    expect(creepIds, [for (var i = 0; i < kCreepsPerWave; i++) kCreepIdBase + i]);
+    expect(sim.entity(kCreepIdBase).kind, EntityKind.creep);
+    expect(sim.entity(kCreepIdBase).teamId, 2); // neutral
+  });
+
+  test('id-keyed reconcile creates and removes entities to match the snapshot', () {
+    final withWave = Simulation.create(const SimConfig(seed: 1));
+    for (var t = 0; t <= kFirstWaveTick; t++) {
+      withWave.step(t, const []);
+    }
+    final noWave = Simulation.create(const SimConfig(seed: 1))..step(0, const []);
+    // (a) restoring the with-wave snapshot CREATES the creeps locally.
+    noWave.restoreFromSnapshot(withWave.snapshotBytes());
+    expect(noWave.entityIdsSorted, withWave.entityIdsSorted);
+    expect(noWave.canonicalStateHash(), withWave.canonicalStateHash());
+    // (b) restoring an early (no-creep) snapshot REMOVES them again.
+    final early = Simulation.create(const SimConfig(seed: 1))..step(0, const []);
+    noWave.restoreFromSnapshot(early.snapshotBytes());
+    expect(noWave.entityIdsSorted.any((id) => id >= kCreepIdBase), isFalse);
+  });
 }

@@ -79,9 +79,13 @@ class MatchController {
 
   /// Reconcile to an authoritative snapshot.
   void onServerSnapshot(SnapshotMsg snap) {
-    // Interpolation always sees fresh ticks (dedupe handled inside).
+    // Interpolation always sees fresh ticks (dedupe handled inside). The
+    // opponent hero is never removed (only downed), so this is normally present;
+    // the nullable peek just requires a guard to compile (caller holds the last).
     final opp = Simulation.peekEntityPos(snap.stateBytes, 1 - localSlot);
-    _interp.add(snap.serverTick, opp.x.toDouble(), opp.y.toDouble());
+    if (opp != null) {
+      _interp.add(snap.serverTick, opp.x.toDouble(), opp.y.toDouble());
+    }
 
     if (snap.serverTick <= _lastReconciledServerTick) return; // stale/dup guard
 
