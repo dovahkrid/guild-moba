@@ -151,4 +151,41 @@ void main() {
     expect(td.towerId, kOuterTower1Id);
     expect(td.killerId, 0);
   });
+
+  test('a hero reduced to 0 hp is downed and respawns after the timer', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final h = sim.entity(1);
+    h.hp = Fixed.zero; // already downed-worthy: 0 hp this tick
+    h.pos = FVec2(Fixed.fromInt(1), Fixed.zero);
+    h.target = h.pos;
+    sim.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero); // keep apart
+    sim.entity(0).target = sim.entity(0).pos;
+    sim.step(0, const []); // hero-death sweep converts 0 hp -> downed
+    expect(h.respawnTimer, kHeroRespawnTicks);
+    expect(h.hp.raw, 0);
+    // Hero id stays present (peekEntityPos must never miss it).
+    expect(sim.entityIdsSorted.contains(1), isTrue);
+    // Run out the timer; respawns at full hp at its spawn x.
+    for (var t = 1; t <= kHeroRespawnTicks; t++) {
+      sim.step(t, const []);
+    }
+    expect(sim.entity(1).respawnTimer, 0);
+    expect(sim.entity(1).hp.raw, kHeroMaxHp.raw);
+    expect(sim.entity(1).pos.x.raw, kHero1SpawnX.raw);
+  });
+
+  test('a downed hero is not a valid target and does not attack', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final h0 = sim.entity(0);
+    h0.respawnTimer = 10;
+    h0.hp = Fixed.zero;
+    h0.pos = const FVec2(Fixed.zero, Fixed.zero);
+    final h1 = sim.entity(1);
+    // Place h1 at y=7 to stay clear of all towers (tower range 6 along x).
+    h1.pos = FVec2(Fixed.fromInt(1), Fixed.fromInt(7));
+    h1.target = h1.pos;
+    sim.step(0, const []);
+    expect(h1.hp.raw, kHeroMaxHp.raw); // downed h0 dealt no damage
+    expect(h0.hp.raw, 0); // untargetable: took none either (hp already 0)
+  });
 }

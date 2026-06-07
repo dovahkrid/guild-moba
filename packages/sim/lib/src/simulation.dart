@@ -152,6 +152,18 @@ class Simulation {
   }
 
   void _stepCombat(List<SimEvent> events) {
+    // Respawn timers count down; a hero whose timer hits 0 returns at full hp.
+    for (final e in _entities) {
+      if (e.kind != EntityKind.hero || e.respawnTimer == 0) continue;
+      e.respawnTimer -= 1;
+      if (e.respawnTimer == 0) {
+        e.hp = e.maxHp;
+        final spawnX = e.teamId == 0 ? kHero0SpawnX : kHero1SpawnX;
+        e.pos = FVec2(spawnX, Fixed.zero);
+        e.target = e.pos;
+        e.attackCooldown = 0;
+      }
+    }
     // Tick cooldowns down for every combatant first.
     for (final e in _entities) {
       if (e.attackCooldown > 0) e.attackCooldown -= 1;
@@ -180,6 +192,18 @@ class Simulation {
     // Despawn dead structures (towers/cores). Heroes (Task 7) and creeps
     // (Task 9) are handled by their own systems.
     _sweepDeadStructures(events);
+    _sweepDeadHeroes();
+  }
+
+  void _sweepDeadHeroes() {
+    for (final e in _entities) {
+      if (e.kind != EntityKind.hero || e.respawnTimer != 0) continue;
+      if (e.hp.raw > 0) continue;
+      e.respawnTimer = kHeroRespawnTicks;
+      final spawnX = e.teamId == 0 ? kHero0SpawnX : kHero1SpawnX;
+      e.pos = FVec2(spawnX, Fixed.zero); // park at base while downed
+      e.target = e.pos;
+    }
   }
 
   Entity? _acquireTowerTarget(Entity tower) {
