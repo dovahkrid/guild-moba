@@ -15,6 +15,7 @@ import 'state/byte_writer.dart';
 
 part 'simulation_combat.dart';
 part 'simulation_elemental.dart';
+part 'simulation_spawning.dart';
 
 /// Version of the canonicalBytes() determinism format (the replay-golden hash).
 const int kSchemaVersion = 3;
@@ -183,27 +184,6 @@ class Simulation {
     if (diff > step) return cur + step;
     if (-diff > step) return cur - step;
     return target;
-  }
-
-  void _maybeSpawnWave(int currentTick) {
-    if (currentTick < kFirstWaveTick) return;
-    if ((currentTick - kFirstWaveTick) % kWaveIntervalTicks != 0) return;
-    final waveIndex = (currentTick - kFirstWaveTick) ~/ kWaveIntervalTicks;
-    for (var i = 0; i < kCreepsPerWave; i++) {
-      final id = kCreepIdBase + waveIndex * kCreepsPerWave + i;
-      if (_byId.containsKey(id)) continue; // idempotent across reconcile re-steps
-      final offset = kCreepSpawnSpacing * Fixed.fromInt(i - (kCreepsPerWave ~/ 2));
-      final e = Entity(
-        id: id,
-        kind: EntityKind.creep,
-        teamId: 2, // neutral
-        pos: FVec2(offset, Fixed.zero),
-        hp: kCreepMaxHp,
-        maxHp: kCreepMaxHp,
-      );
-      _entities.add(e);
-      _byId[id] = e;
-    }
   }
 
   /// Canonical, integer-only, ordered byte encoding of the full state.
