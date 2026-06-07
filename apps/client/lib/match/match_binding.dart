@@ -20,8 +20,15 @@ class MatchBinding {
   int _accMs = 0;
   static const int _tickMs = 33; // ~30 Hz
 
+  bool _ended = false;
+  int _winnerSlot = -1;
+
   bool get isReady => _controller != null;
   MatchView? get view => _controller?.update(_renderTimeMs);
+
+  bool get isOver => _ended;
+  int? get winnerSlot => _ended ? _winnerSlot : null;
+  int? get localSlot => _controller?.localSlot;
 
   void _onFrame(List<int> frame) {
     final msg = ProtocolCodec.decode(frame);
@@ -34,8 +41,8 @@ class MatchBinding {
     } else if (msg is SnapshotMsg) {
       _controller?.onServerSnapshot(msg);
     } else if (msg is MatchEndMsg) {
-      // Slice: stop pumping; UI can show "opponent left".
-      _controller = null;
+      _winnerSlot = msg.winnerSlot;
+      _ended = true; // keep the controller so the final frame stays rendered
     }
   }
 
@@ -47,10 +54,18 @@ class MatchBinding {
     _transport.send(ProtocolCodec.encode(input));
   }
 
+  /// Local input: right-click an enemy entity id -> attack-lock. Predict + send.
+  void submitAttack(int targetId) {
+    final c = _controller;
+    if (c == null) return;
+    _transport.send(ProtocolCodec.encode(c.applyAttackInput(targetId)));
+  }
+
   /// Advance by [dtMs] of real time: accumulate and step the predicted sim at
   /// a fixed 30 Hz; advance the render clock for interpolation.
   void tick(int dtMs) {
     _renderTimeMs += dtMs;
+    if (_ended) return;
     _accMs += dtMs;
     while (_accMs >= _tickMs) {
       _accMs -= _tickMs;

@@ -8,6 +8,7 @@ import 'net/ws_transport.dart';
 import 'render/guild_game.dart';
 import 'ui/dev_panel.dart';
 import 'ui/hud_overlay.dart';
+import 'ui/result_overlay.dart';
 
 void main() {
   const config = ClientConfig();
@@ -31,6 +32,7 @@ void main() {
           overlayBuilderMap: {
             'hud': (context, _) => HudOverlay(binding: binding),
             'dev': (context, _) => DevPanel(transport: devTransport),
+            'result': (context, _) => ResultOverlay(binding: binding),
           },
           initialActiveOverlays: const ['hud', 'dev'],
         ),

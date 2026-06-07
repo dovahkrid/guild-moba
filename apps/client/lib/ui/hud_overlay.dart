@@ -47,6 +47,7 @@ class _HudOverlayState extends State<HudOverlay>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text('gold: ${v?.localGold ?? '-'}'),
               Text(
                 'predictedTick: ${v?.predictedTick ?? '-'}',
               ),

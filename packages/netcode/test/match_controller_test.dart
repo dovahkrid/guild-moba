@@ -33,6 +33,21 @@ void main() {
     expect(msg.aimY, 262144);
   });
 
+  test('update() exposes all entities with kind/team/hp and the local/opponent getters', () {
+    final c = _ctrl(slot: 0);
+    c.advanceClientTick();
+    final v = c.update(0);
+    // 9 static entities exist at start (2 heroes, wanderer, 2 cores, 4 towers).
+    expect(v.entities.length, greaterThanOrEqualTo(9));
+    expect(v.localSlot, 0);
+    expect(v.local.id, 0);
+    expect(v.opponent.id, 1);
+    final core = v.entities.firstWhere((e) => e.id == 10);
+    expect(core.kind, EntityKind.core.index);
+    expect(core.maxHp, greaterThan(0));
+    expect(v.localGold, 0);
+  });
+
   test('reconcile to a fresh snapshot with no pending leaves no correction', () {
     // Build an authoritative sim that advanced identically with no input.
     final server = Simulation.create(const SimConfig(seed: 1337));

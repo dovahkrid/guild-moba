@@ -65,4 +65,19 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(binding.view!.lastServerTick, 5);
   });
+
+  test('surfaces the winner from a MatchEndMsg', () async {
+    final mem = _MemTransport();
+    final binding = MatchBinding(mem);
+    mem.serverPush(ProtocolCodec.encode(const MatchStartMsg(
+        yourSlot: 0, seed: 1337, tickRateHz: 30, snapshotRateHz: 20, startTick: 0)));
+    await Future<void>.delayed(Duration.zero);
+    expect(binding.isOver, isFalse);
+    mem.serverPush(ProtocolCodec.encode(
+        const MatchEndMsg(reason: EndReason.coreDestroyed, winnerSlot: 0)));
+    await Future<void>.delayed(Duration.zero);
+    expect(binding.isOver, isTrue);
+    expect(binding.winnerSlot, 0);
+    expect(binding.localSlot, 0);
+  });
 }

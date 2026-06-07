@@ -1,5 +1,3 @@
-import 'match_view.dart';
-
 class _Sample {
   final int tick;
   final int timeMs;
@@ -24,26 +22,26 @@ class InterpolationBuffer {
 
   int get length => _samples.length;
 
-  /// Sample the opponent position at logical time [targetTimeMs].
-  RenderEntity sample(int targetTimeMs) {
-    if (_samples.isEmpty) return const RenderEntity(0, 0);
+  /// Sample the opponent position at logical time [targetTimeMs]. Returns (x, y).
+  ({double x, double y}) sample(int targetTimeMs) {
+    if (_samples.isEmpty) return (x: 0.0, y: 0.0);
     if (targetTimeMs <= _samples.first.timeMs) {
       final s = _samples.first;
-      return RenderEntity(s.x, s.y);
+      return (x: s.x, y: s.y);
     }
     if (targetTimeMs >= _samples.last.timeMs) {
       final s = _samples.last; // HOLD — never extrapolate
-      return RenderEntity(s.x, s.y);
+      return (x: s.x, y: s.y);
     }
     for (var i = 0; i < _samples.length - 1; i++) {
       final a = _samples[i], b = _samples[i + 1];
       if (targetTimeMs >= a.timeMs && targetTimeMs <= b.timeMs) {
         final span = (b.timeMs - a.timeMs);
         final alpha = span == 0 ? 0.0 : (targetTimeMs - a.timeMs) / span;
-        return RenderEntity(a.x + (b.x - a.x) * alpha, a.y + (b.y - a.y) * alpha);
+        return (x: a.x + (b.x - a.x) * alpha, y: a.y + (b.y - a.y) * alpha);
       }
     }
     final s = _samples.last;
-    return RenderEntity(s.x, s.y);
+    return (x: s.x, y: s.y);
   }
 }

@@ -57,6 +57,26 @@ class MatchController {
         type: IntentType.move.index);
   }
 
+  /// Record + apply a local ATTACK lock onto [targetId]; returns the InputMsg to
+  /// send. Mirrors applyLocalInput but with IntentType.attack (aimX = targetId).
+  InputMsg applyAttackInput(int targetId) {
+    final seq = ++_localSeq;
+    final intent = Intent(
+        playerSlot: localSlot,
+        type: IntentType.attack,
+        aimX: targetId,
+        seq: seq,
+        clientTick: _nextTick);
+    _pending.add(_Pending(_nextTick, intent));
+    return InputMsg(
+        slot: localSlot,
+        seq: seq,
+        clientTick: _nextTick,
+        aimX: targetId,
+        aimY: 0,
+        type: IntentType.attack.index);
+  }
+
   /// The held local intent in effect at tick [t] = latest pending with clientTick <= t.
   Intent? _heldAt(int t) {
     Intent? held;
@@ -113,15 +133,35 @@ class MatchController {
     _lastReconciledServerTick = snap.serverTick;
   }
 
-  /// Render view (host calls per frame). Opponent interpolated ~100ms behind.
+  /// Render view (host calls per frame). Opponent hero interpolated ~100ms
+  /// behind; everything else from the predicted sim.
   MatchView update(int renderTimeMs) {
-    final local = _predicted.entity(localSlot).pos;
-    final wanderer = _predicted.entity(kWandererEntityId).pos;
-    final opp = _interp.sample(renderTimeMs - 100);
+    final oppId = 1 - localSlot;
+    final hasInterp = _interp.length > 0;
+    final opp = hasInterp ? _interp.sample(renderTimeMs - 100) : null;
+    final entities = <RenderEntity>[];
+    for (final id in _predicted.entityIdsSorted) {
+      final e = _predicted.entity(id);
+      var x = e.pos.x.toDouble();
+      var y = e.pos.y.toDouble();
+      if (id == oppId && opp != null) {
+        x = opp.x; // opponent hero interpolated ~100ms behind
+        y = opp.y;
+      }
+      entities.add(RenderEntity(
+        id: id,
+        kind: e.kind.index,
+        teamId: e.teamId,
+        x: x,
+        y: y,
+        hp: e.hp.toDouble(),
+        maxHp: e.maxHp.toDouble(),
+      ));
+    }
     return MatchView(
-      local: RenderEntity(local.x.toDouble(), local.y.toDouble()),
-      opponent: opp,
-      wanderer: RenderEntity(wanderer.x.toDouble(), wanderer.y.toDouble()),
+      entities: entities,
+      localSlot: localSlot,
+      localGold: _predicted.entity(localSlot).gold,
       predictedTick: _nextTick,
       lastServerTick: _lastReconciledServerTick,
       pendingInputCount: _pending.length,
