@@ -63,6 +63,17 @@ class MatchBinding {
     _transport.send(ProtocolCodec.encode(c.applyAttackInput(targetId)));
   }
 
+  /// Local input: left-click a world point (Q16.16 raw) -> ability cast. Predict + send.
+  void submitAbility(int aimXRaw, int aimYRaw) {
+    if (_ended) return; // no input after the match ends
+    final c = _controller;
+    if (c == null) return;
+    _transport.send(ProtocolCodec.encode(c.applyAbilityInput(aimXRaw, aimYRaw)));
+  }
+
+  /// Reactions that fired since the last frame (host spawns pop-text once/frame).
+  List<RenderReaction> drainReactions() => _controller?.drainReactions() ?? const [];
+
   /// Advance by [dtMs] of real time: accumulate and step the predicted sim at
   /// a fixed 30 Hz; advance the render clock for interpolation.
   ///

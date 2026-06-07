@@ -7,15 +7,18 @@ import 'package:sim/sim.dart' show EntityKind;
 import '../match/match_binding.dart';
 import 'coord.dart';
 import 'entity_view.dart';
+import 'field_view.dart';
+import 'reaction_label.dart';
 import 'world_backdrop.dart';
 
 /// The Flame game. Renders MatchView's entity list as colored shapes; holds ZERO
 /// gameplay truth. Spawns/despawns EntityViews via an id-keyed diff each frame.
-class GuildGame extends FlameGame with SecondaryTapCallbacks {
+class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
   GuildGame(this.binding);
 
   final MatchBinding binding;
   final Map<int, EntityView> _views = {};
+  final Map<int, FieldView> _fieldViews = {}; // keyed by field ownerId
 
   @override
   Future<void> onLoad() async {
@@ -53,11 +56,40 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks {
     for (final id in gone) {
       _views.remove(id)?.removeFromParent();
     }
+
+    // Feed elemental status to each entity view (discrete; never interpolated).
+    for (final re in v.entities) {
+      _views[re.id]?.statusElement = re.statusElement;
+    }
+    // Diff field zones (keyed by ownerId).
+    final seenFields = <int>{};
+    for (final rf in v.fields) {
+      seenFields.add(rf.ownerId);
+      var fv = _fieldViews[rf.ownerId];
+      if (fv == null || fv.element != rf.element) {
+        fv?.removeFromParent();
+        fv = FieldView(element: rf.element, radius: rf.radius);
+        _fieldViews[rf.ownerId] = fv;
+        world.add(fv);
+      }
+      fv.position.setValues(worldToFlameX(rf.x), worldToFlameY(rf.y));
+    }
+    for (final id in _fieldViews.keys.where((id) => !seenFields.contains(id)).toList()) {
+      _fieldViews.remove(id)?.removeFromParent();
+    }
+    // Spawn a pop-text per reaction that fired this frame.
+    for (final r in binding.drainReactions()) {
+      final mult = r.multiplierRaw / 65536.0;
+      world.add(ReactionLabel(
+        text: 'VAPORIZE x${mult.toStringAsFixed(1)}',
+        position: Vector2(worldToFlameX(r.x), worldToFlameY(r.y)),
+      ));
+    }
   }
 
   /// LoL right-click semantics: right-clicking ON an enemy locks an attack onto
   /// it; right-clicking the ground issues a move (which clears any lock).
-  /// Left-click is unused (selection is not modeled).
+  /// Left-click is the ability aim (see [onTapUp]).
   @override
   void onSecondaryTapUp(SecondaryTapUpEvent event) {
     final worldPos = camera.globalToLocal(event.canvasPosition);
@@ -72,6 +104,14 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks {
       }
     }
     binding.submitMoveTo(worldToRaw(wx), worldToRaw(wy));
+  }
+
+  /// Left-click = ability aim: cast the hero's field at the clicked world point.
+  @override
+  void onTapUp(TapUpEvent event) {
+    final worldPos = camera.globalToLocal(event.canvasPosition);
+    binding.submitAbility(
+        worldToRaw(flameToWorld(worldPos.x)), worldToRaw(flameToWorld(worldPos.y)));
   }
 
   /// Nearest valid enemy entity within a small click radius (world units), else null.

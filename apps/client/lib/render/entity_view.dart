@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:sim/sim.dart' show EntityKind;
 
+import 'element_palette.dart';
+
 /// A Flame view of one sim entity. Branches its shape/color on (kind, teamId)
 /// and renders a health bar. Purely cosmetic — never feeds back into the sim.
 class EntityView extends PositionComponent {
@@ -21,6 +23,10 @@ class EntityView extends PositionComponent {
 
   /// 0..1 health fraction (set from MatchView each frame).
   double hpRatio = 1.0;
+
+  /// Elemental status (Element.index, -1 = none); set from MatchView each frame.
+  int statusElement = -1;
+  CircleComponent? _statusRing;
 
   RectangleComponent? _hpFg;
   double _barW = 0;
@@ -50,6 +56,16 @@ class EntityView extends PositionComponent {
           ..color = const Color(0xFFFFFFFF),
       ));
     }
+    // Elemental-status ring (Plan 4): colour set each frame from statusElement.
+    _statusRing = CircleComponent(
+      radius: size.x / 2 + 4,
+      anchor: Anchor.center,
+      paint: Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = const Color(0x00000000), // transparent until coated
+    );
+    await add(_statusRing!);
     // Health bar (skip the neutral wanderer — it has no combat role).
     if (kind != EntityKind.wanderer.index) {
       _barW = size.x;
@@ -74,6 +90,10 @@ class EntityView extends PositionComponent {
     position.lerp(target, (_kLerpSpeed * dt).clamp(0.0, 1.0));
     final fg = _hpFg;
     if (fg != null) fg.size.x = _barW * hpRatio.clamp(0.0, 1.0);
+    final ring = _statusRing;
+    if (ring != null) {
+      ring.paint.color = elementColor(statusElement) ?? const Color(0x00000000);
+    }
   }
 
   Color _color() {
