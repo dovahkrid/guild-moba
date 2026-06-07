@@ -142,6 +142,7 @@ void main() {
     b.target = b.pos;
     sim.step(0, const [Intent(playerSlot: 0, type: IntentType.attack, aimX: 1, seq: 1)]);
     expect(b.statusElement, Element.pyro.index);
+    expect(b.hp.raw, lessThan(kHeroMaxHp.raw)); // _applyHit also dealt damage (chokepoint)
   });
 
   test('same-element re-application refreshes the timer (no stacking)', () {
@@ -171,5 +172,6 @@ void main() {
       sim.step(t, const []);
     }
     expect(h.statusElement, -1); // swept after statusTimer hit 0
+    expect(h.statusTimer, 0); // timer floored before the sweep cleared the element
   });
 }

@@ -252,7 +252,8 @@ class Simulation {
       _applyDamage(e, target, kTowerAttackDamage, events);
       e.attackCooldown = kTowerAttackCooldownTicks;
     }
-    // Sweep expired statuses (a status expiring this tick already reacted above).
+    // Sweep expired statuses. Once reactions land (Task 6), a status whose timer
+    // hit 0 this tick will already have been consumed before this sweep runs.
     for (final e in _entities) {
       if (e.statusTimer == 0 && e.statusElement != -1) e.statusElement = -1;
     }
@@ -420,6 +421,10 @@ class Simulation {
         if (u.kind == EntityKind.hero && u.respawnTimer != 0) continue; // downed
         if ((u.pos - f.center).lengthSq() > kFieldRadiusSq) continue;
         final dot = u.kind == EntityKind.creep ? Fixed.zero : kFieldDotDamage;
+        // Owner is always a hero, and heroes are downed-not-removed, so
+        // _byId[f.ownerId] is non-null while the field is alive: the respawn
+        // block clears _fields for any returning hero, and _removeEntity (creeps/
+        // structures) never touches _fields.
         _applyHit(_byId[f.ownerId]!, u, dot, f.element, events);
       }
     }
