@@ -2,7 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:netcode/netcode.dart' show MatchView, RenderEntity;
-import 'package:sim/sim.dart' show EntityKind, kOne;
+import 'package:sim/sim.dart' show EntityKind;
 
 import '../match/match_binding.dart';
 import 'coord.dart';
@@ -74,11 +74,10 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
     for (final id in _fieldViews.keys.where((id) => !seenFields.contains(id)).toList()) {
       _fieldViews.remove(id)?.removeFromParent();
     }
-    // Spawn a pop-text per reaction that fired this frame.
+    // Spawn a pop-text per reaction that fired this frame (flat vs amplify).
     for (final r in binding.drainReactions()) {
-      final mult = r.multiplierRaw / kOne; // Q16.16 raw → double (int / int = double in Dart)
       world.add(ReactionLabel(
-        text: 'VAPORIZE x${mult.toStringAsFixed(1)}',
+        text: reactionText(r.reaction, r.multiplierRaw),
         position: Vector2(worldToFlameX(r.x), worldToFlameY(r.y)),
       ));
     }
