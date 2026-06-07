@@ -218,8 +218,9 @@ class Simulation {
         _fields.removeWhere((f) => f.ownerId == e.id);
       }
     }
-    // Tick every per-unit timer down first (statusTimer is swept to -1 AFTER
-    // reactions in Task 5; reactionIcd guards the next reaction). Runs for every
+    // Tick every per-unit timer down first so a statusTimer that hits 0 this tick
+    // can still react (via _stepFields/_applyHit) before the end-of-step sweep
+    // clears the element; reactionIcd guards the next reaction. Runs for every
     // entity incl. downed heroes — their status/icd are reset on respawn regardless.
     for (final e in _entities) {
       if (e.attackCooldown > 0) e.attackCooldown -= 1;
@@ -421,7 +422,8 @@ class Simulation {
           multiplierRaw: kVaporizeMult.raw,
           sourceId: source.id));
     } else {
-      // Coat (set/refresh). A different element suppressed by ICD overwrites here.
+      // Coat (set/refresh). If ICD is active a different element still coats here
+      // (no reaction; the old status is replaced) — ICD gates only the detonation.
       target.statusElement = element;
       target.statusTimer = kStatusDurationTicks;
       dmg = baseDamage;

@@ -226,7 +226,7 @@ void main() {
     sim.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
     sim.entity(0).target = sim.entity(0).pos;
     final events = sim.step(0, const []);
-    expect(events.whereType<ReactionTriggered>(), isNotEmpty); // still reacted
+    expect(events.whereType<ReactionTriggered>().single.unitId, 1); // exactly one reaction, on hero 1
     expect(h.statusElement, -1); // then consumed/swept
   });
 
@@ -246,7 +246,9 @@ void main() {
     sim.entity(1).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
     sim.entity(1).target = sim.entity(1).pos;
     sim.step(kFirstWaveTick + 1, const []);
-    expect(creep.hp.raw, (hpBefore - (kHeroAttackDamage * kVaporizeMult)).raw); // 8 × 1.3
+    expect(creep.hp.raw, (hpBefore - (kHeroAttackDamage * kVaporizeMult)).raw);
+    // amplified dmg = kHeroAttackDamage * kVaporizeMult via the Fixed Q16.16
+    // multiply (NOT naive round(10.4 * 65536) — limb-split rounding differs slightly).
     expect(creep.statusElement, -1);
 
     // (b) field-triggered Vaporize on a creep deals ZERO (coat-not-farm).
