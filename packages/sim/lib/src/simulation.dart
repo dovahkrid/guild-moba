@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'data/combat.dart';
+import 'data/elements.dart';
 import 'events.dart';
 import 'math/det_rng.dart';
 import 'math/fixed.dart';
@@ -109,6 +110,18 @@ class Simulation {
         hero.attackTargetId = -1;
       } else if (it.type == IntentType.attack) {
         hero.attackTargetId = it.aimX; // aimX carries the target entity id
+      } else if (it.type == IntentType.ability) {
+        if (hero.abilityCooldown != 0) continue; // on cooldown → ignore the cast
+        _fields.removeWhere((f) => f.ownerId == hero.id); // ≤1 active field per hero
+        final center = heroPlacesAtSelf(hero.id)
+            ? hero.pos // Cinderfang: Ember Field at his feet (melee)
+            : FVec2(Fixed.raw(it.aimX), Fixed.raw(it.aimY)); // Marisol: Tidepool at aim
+        _fields.add(ElementalField(
+            ownerId: hero.id,
+            center: center,
+            element: heroElement(hero.id),
+            timer: kFieldDurationTicks));
+        hero.abilityCooldown = kAbilityCooldownTicks;
       }
     }
 
@@ -194,12 +207,26 @@ class Simulation {
         e.pos = FVec2(_heroSpawnX(e), Fixed.zero);
         e.target = e.pos;
         e.attackCooldown = 0;
+        // Plan 4: a fresh respawn carries no elemental status; drop the field too.
+        e.statusElement = -1;
+        e.statusTimer = 0;
+        e.reactionIcd = 0;
+        _fields.removeWhere((f) => f.ownerId == e.id);
       }
     }
-    // Tick cooldowns down for every combatant first.
+    // Tick every per-unit timer down first (statusTimer is swept to -1 AFTER
+    // reactions in Task 5; reactionIcd guards the next reaction).
     for (final e in _entities) {
       if (e.attackCooldown > 0) e.attackCooldown -= 1;
+      if (e.abilityCooldown > 0) e.abilityCooldown -= 1;
+      if (e.reactionIcd > 0) e.reactionIcd -= 1;
+      if (e.statusTimer > 0) e.statusTimer -= 1;
     }
+    for (final f in _fields) {
+      if (f.timer > 0) f.timer -= 1;
+    }
+    // (Task 5 inserts `_stepFields(events);` HERE — field ticks coat units in range.)
+    _fields.removeWhere((f) => f.timer <= 0); // expired fields gone (after their final tick)
     // Heroes attack ONLY their locked target, in ascending-id order. Pursue
     // (step 2) has already closed distance; here we just fire when in range.
     for (final id in entityIdsSorted) {
