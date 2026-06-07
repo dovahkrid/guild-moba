@@ -10,3 +10,4 @@ export 'src/model/intent.dart';
 export 'src/model/sim_config.dart';
 export 'src/simulation.dart';
 export 'src/events.dart';
+export 'src/data/combat.dart';
