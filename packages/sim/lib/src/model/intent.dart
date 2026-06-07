@@ -1,4 +1,4 @@
-enum IntentType { none, move }
+enum IntentType { none, move, attack }
 
 /// A player command for a tick. Aim values are Q16.16 raw ints.
 class Intent {
