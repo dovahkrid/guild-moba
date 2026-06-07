@@ -140,6 +140,7 @@ class Simulation {
       w.i32(e.gold);
       w.i32(e.respawnTimer);
       w.i32(e.attackTargetId);
+      // NOTE: target is intentionally NOT in the canonical format (snapshot-only).
     }
     return w.toBytes();
   }
@@ -182,7 +183,8 @@ class Simulation {
 
   /// Overwrite this sim's entire state from snapshotBytes(). Reuses the existing
   /// Entity instances (ids are stable from create()). FVec2 is immutable, so we
-  /// reassign Entity.pos/vel/target (all mutable fields).
+  /// reassign the mutable fields: pos/vel/target plus
+  /// hp/maxHp and the int combat fields (attackCooldown/gold/respawnTimer/attackTargetId).
   void restoreFromSnapshot(Uint8List bytes) {
     final r = ByteReader(bytes);
     final version = r.i32();
