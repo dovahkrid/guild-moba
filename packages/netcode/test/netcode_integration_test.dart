@@ -30,7 +30,7 @@ void main() {
     final t = _makeTransport(oneWayLatencyMs: 0, lossRate: 0.0);
     // Apply a move so the hero walks somewhere — onto its OWN (left) half so it
     // never enters the enemy outer tower's range (x=+4, range 6): stays combat-free.
-    final msg = t.client.applyLocalInput(-655360, 0); // → x=-10
+    final msg = t.client.applyLocalInput(-655360, 0)!; // → x=-10
     t.clientSend(msg);
 
     var reconciled = false;
@@ -54,7 +54,7 @@ void main() {
     // Apply a move that makes the hero move to a specific target.
     // The hero starts at x = Fixed.fromInt(-8). Target a point on its OWN (left)
     // half (x=-12) so it never enters the enemy tower's range — combat-free.
-    final msg = t.client.applyLocalInput(Fixed.fromInt(-12).raw, Fixed.fromInt(0).raw);
+    final msg = t.client.applyLocalInput(Fixed.fromInt(-12).raw, Fixed.fromInt(0).raw)!;
     t.clientSend(msg);
 
     var maxCorrectionInMotion = 0.0;
@@ -127,7 +127,7 @@ void main() {
       // Alternate aim every 5 frames to keep unacked inputs in-flight at 150ms.
       if (i % 5 == 0) {
         final aim = (i ~/ 5) % 2 == 0 ? aimA : aimB;
-        final msg = t.client.applyLocalInput(aim, 0);
+        final msg = t.client.applyLocalInput(aim, 0)!;
         t.clientSend(msg);
       }
       t.tickWorld();
@@ -162,7 +162,7 @@ void main() {
     final t = _makeTransport(lossRate: 0.30);
 
     // Send initial move onto the local hero's OWN (left) half — combat-free.
-    final msg = t.client.applyLocalInput(-655360, 0); // → x=-10
+    final msg = t.client.applyLocalInput(-655360, 0)!; // → x=-10
     t.clientSend(msg);
 
     // Two distinct aim points that change the target meaningfully but keep the
@@ -179,7 +179,7 @@ void main() {
       // reflects real sustained divergence under loss.
       if (i % 10 == 0) {
         final aim = (i ~/ 10) % 2 == 0 ? aimA : aimB;
-        final msg2 = t.client.applyLocalInput(aim, 0);
+        final msg2 = t.client.applyLocalInput(aim, 0)!;
         t.clientSend(msg2);
       }
       // No throws expected.
@@ -210,7 +210,7 @@ void main() {
     }
 
     // Send the second intent to the server — this is the "re-send" / next input.
-    final msg2 = t.client.applyLocalInput(-655360, 0); // → x=-10
+    final msg2 = t.client.applyLocalInput(-655360, 0)!; // → x=-10
     t.clientSend(msg2);
 
     for (var i = 0; i < 115; i++) {
@@ -324,7 +324,7 @@ void main() {
 
     // Also move the client hero so snapshots are more interesting — onto its OWN
     // (left) half (x=-12) so it stays out of the enemy tower's range (combat-free).
-    final msg = t.client.applyLocalInput(Fixed.fromInt(-12).raw, 0);
+    final msg = t.client.applyLocalInput(Fixed.fromInt(-12).raw, 0)!;
     t.clientSend(msg);
 
     // Drive the opponent in a straight line (+x direction) for many frames.
@@ -402,7 +402,7 @@ void main() {
   test('case 8: identical seed → identical client hash (determinism)', () {
     int runHash(int seed) {
       final t = _makeTransport(seed: seed, oneWayLatencyMs: 75, lossRate: 0.10);
-      final msg = t.client.applyLocalInput(-655360, 131072); // → (x=-10, y=2): own half, combat-free
+      final msg = t.client.applyLocalInput(-655360, 131072)!; // → (x=-10, y=2): own half, combat-free
       t.clientSend(msg);
       for (var i = 0; i < 80; i++) {
         t.tickWorld();
@@ -428,7 +428,7 @@ void main() {
 
     // Send one explicit move input at the start — onto the local hero's OWN
     // (left) half (x=-10) so it stays out of the enemy tower's range (combat-free).
-    final msg = t.client.applyLocalInput(-655360, 0); // → x=-10
+    final msg = t.client.applyLocalInput(-655360, 0)!; // → x=-10
     t.clientSend(msg);
 
     // Run until stable (hero reaches target).

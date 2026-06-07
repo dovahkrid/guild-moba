@@ -66,6 +66,24 @@ void main() {
     expect(binding.view!.lastServerTick, 5);
   });
 
+  test('Plan 6: no input is sent while the local hero is downed', () async {
+    final mem = _MemTransport();
+    final binding = MatchBinding(mem);
+    mem.serverPush(ProtocolCodec.encode(const MatchStartMsg(
+        yourSlot: 0, seed: 1337, tickRateHz: 30, snapshotRateHz: 20, startTick: 0)));
+    await Future<void>.delayed(Duration.zero);
+    // Authoritative snapshot: hero 0 is downed.
+    final srv = Simulation.create(const SimConfig(seed: 1337));
+    srv.entity(0).hp = Fixed.zero;
+    srv.step(0, const []);
+    mem.serverPush(ProtocolCodec.encode(SnapshotMsg(
+        serverTick: 0, ackedSeq: const [0, 0], stateBytes: srv.snapshotBytes())));
+    await Future<void>.delayed(Duration.zero);
+    binding.submitMoveTo(655360, 0); // click while dead
+    final sent = mem.sent.map(ProtocolCodec.decode).whereType<InputMsg>().toList();
+    expect(sent, isEmpty); // nothing sent
+  });
+
   test('surfaces the winner from a MatchEndMsg', () async {
     final mem = _MemTransport();
     final binding = MatchBinding(mem);

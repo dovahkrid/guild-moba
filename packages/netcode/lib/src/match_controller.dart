@@ -39,7 +39,9 @@ class MatchController {
   FVec2 debugLocalPos() => _predicted.entity(localSlot).pos;
 
   /// Record + apply a local move. Returns the InputMsg the host must send.
-  InputMsg applyLocalInput(int aimX, int aimY) {
+  /// Returns null (and records nothing) while the local hero is downed (Plan 6).
+  InputMsg? applyLocalInput(int aimX, int aimY) {
+    if (_predicted.entity(localSlot).isDowned) return null; // Plan 6: dead -> ignore input
     final seq = ++_localSeq;
     final intent = Intent(
         playerSlot: localSlot,
@@ -59,8 +61,9 @@ class MatchController {
   }
 
   /// Record + apply a local ATTACK lock onto [targetId]; returns the InputMsg to
-  /// send. Mirrors applyLocalInput but with IntentType.attack (aimX = targetId).
-  InputMsg applyAttackInput(int targetId) {
+  /// send. Returns null (and records nothing) while the local hero is downed (Plan 6).
+  InputMsg? applyAttackInput(int targetId) {
+    if (_predicted.entity(localSlot).isDowned) return null; // Plan 6: dead -> ignore input
     final seq = ++_localSeq;
     final intent = Intent(
         playerSlot: localSlot,
@@ -79,8 +82,9 @@ class MatchController {
   }
 
   /// Record + apply a local ABILITY cast at world point (aimX,aimY) (Q16.16 raw);
-  /// returns the InputMsg to send. Mirrors applyLocalInput with IntentType.ability.
-  InputMsg applyAbilityInput(int aimX, int aimY) {
+  /// returns the InputMsg to send. Returns null (and records nothing) while the local hero is downed (Plan 6).
+  InputMsg? applyAbilityInput(int aimX, int aimY) {
+    if (_predicted.entity(localSlot).isDowned) return null; // Plan 6: dead -> ignore input
     final seq = ++_localSeq;
     final intent = Intent(
         playerSlot: localSlot,

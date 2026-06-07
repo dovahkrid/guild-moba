@@ -52,6 +52,7 @@ class MatchBinding {
     final c = _controller;
     if (c == null) return;
     final input = c.applyLocalInput(aimXRaw, aimYRaw);
+    if (input == null) return; // Plan 6: dead hero -> nothing to send
     _transport.send(ProtocolCodec.encode(input));
   }
 
@@ -60,7 +61,9 @@ class MatchBinding {
     if (_ended) return; // no input after the match ends
     final c = _controller;
     if (c == null) return;
-    _transport.send(ProtocolCodec.encode(c.applyAttackInput(targetId)));
+    final input = c.applyAttackInput(targetId);
+    if (input == null) return; // Plan 6: dead hero -> nothing to send
+    _transport.send(ProtocolCodec.encode(input));
   }
 
   /// Local input: left-click a world point (Q16.16 raw) -> ability cast. Predict + send.
@@ -68,7 +71,9 @@ class MatchBinding {
     if (_ended) return; // no input after the match ends
     final c = _controller;
     if (c == null) return;
-    _transport.send(ProtocolCodec.encode(c.applyAbilityInput(aimXRaw, aimYRaw)));
+    final input = c.applyAbilityInput(aimXRaw, aimYRaw);
+    if (input == null) return; // Plan 6: dead hero -> nothing to send
+    _transport.send(ProtocolCodec.encode(input));
   }
 
   /// Reactions that fired since the last frame (host spawns pop-text once/frame).

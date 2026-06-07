@@ -28,7 +28,7 @@ void main() {
 
   test('applyLocalInput returns an InputMsg stamped with the local slot+seq', () {
     final c = _ctrl(slot: 1);
-    final msg = c.applyLocalInput(0, 262144);
+    final msg = c.applyLocalInput(0, 262144)!;
     expect(msg.slot, 1);
     expect(msg.seq, 1);
     expect(msg.type, IntentType.move.index);
@@ -67,7 +67,7 @@ void main() {
 
   test('applyAbilityInput emits an ability InputMsg carrying the aim point', () {
     final c = MatchController(seed: 1, localSlot: 1, startTick: 0);
-    final msg = c.applyAbilityInput(196608, 458752);
+    final msg = c.applyAbilityInput(196608, 458752)!;
     expect(msg.type, IntentType.ability.index);
     expect(msg.slot, 1);
     expect(msg.aimX, 196608);
@@ -113,6 +113,56 @@ void main() {
     }
     expect(c.debugLocalPos().x.raw, greaterThan(startX)); // kept moving (move is held)
     expect(c.update(0).fields.where((f) => f.ownerId == 0), hasLength(1)); // one field (duration 120 > 30)
+  });
+
+  test('Plan 6: input is gated (returns null, nothing pending) while the local hero is downed', () {
+    final c = _ctrl(slot: 0);
+    final server = Simulation.create(const SimConfig(seed: 1337));
+    server.entity(0).hp = Fixed.zero;
+    server.step(0, const []); // server downs hero 0
+    c.onServerSnapshot(SnapshotMsg(
+        serverTick: 0, ackedSeq: const [0, 0], stateBytes: server.snapshotBytes()));
+    expect(c.applyLocalInput(655360, 0), isNull); // move gated
+    expect(c.applyAttackInput(1), isNull); // attack gated
+    expect(c.applyAbilityInput(0, 0), isNull); // ability gated
+    expect(c.pendingCount, 0); // nothing recorded
+  });
+
+  test('Plan 6: a fresh post-respawn click is honored (gating only applies while downed)', () {
+    final c = _ctrl(slot: 0);
+    final server = Simulation.create(const SimConfig(seed: 1337));
+    server.entity(0).hp = Fixed.zero;
+    server.step(0, const []); // server completes tick 0 with hero 0 downed
+    c.advanceClientTick(); // client completes tick 0, _nextTick = 1
+    c.onServerSnapshot(SnapshotMsg(
+        serverTick: 0, ackedSeq: const [0, 0], stateBytes: server.snapshotBytes()));
+    for (var t = 1; t <= kHeroRespawnTicks; t++) {
+      c.advanceClientTick(); // ticks 1..150: respawnTimer 150 -> 0
+    }
+    expect(c.update(0).local.hp, greaterThan(0.0)); // back alive
+    final msg = c.applyLocalInput(655360, 0);
+    expect(msg, isNotNull); // honored now
+    final startX = c.debugLocalPos().x.raw;
+    for (var i = 0; i < 5; i++) {
+      c.advanceClientTick();
+    }
+    expect(c.debugLocalPos().x.raw, greaterThan(startX)); // moved
+  });
+
+  test('Plan 6: clicks during downtime are dropped; the hero still stands after respawn', () {
+    final c = _ctrl(slot: 0);
+    final server = Simulation.create(const SimConfig(seed: 1337));
+    server.entity(0).hp = Fixed.zero;
+    server.step(0, const []);
+    c.advanceClientTick();
+    c.onServerSnapshot(SnapshotMsg(
+        serverTick: 0, ackedSeq: const [0, 0], stateBytes: server.snapshotBytes()));
+    expect(c.applyLocalInput(655360, 0), isNull); // mashed during downtime -> dropped
+    expect(c.pendingCount, 0);
+    for (var t = 1; t <= kHeroRespawnTicks + 2; t++) {
+      c.advanceClientTick();
+    }
+    expect(c.debugLocalPos().x.raw, kHero0SpawnX.raw); // stood at spawn, never walked
   });
 
   test('reconcile reproduces a SINGLE cast (no re-fire): exact hash match', () {
