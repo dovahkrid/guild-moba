@@ -188,7 +188,10 @@ class Simulation {
   }
 
   /// Decode just one entity's pos from snapshotBytes() (for the interpolation
-  /// buffer) without allocating a Simulation.
+  /// buffer) without allocating a Simulation. Static — cannot move to the
+  /// SimulationSerialization extension (Dart extension members are never static);
+  /// derives from [_entityBodyCodecs] so it stays aligned with the writers when a
+  /// field is added.
   static FVec2? peekEntityPos(Uint8List bytes, int id) {
     final r = ByteReader(bytes);
     r.i32(); // version
@@ -198,24 +201,16 @@ class Simulation {
     r.i32(); // winnerTeam
     final count = r.i32();
     for (var i = 0; i < count; i++) {
-      final eid = r.i32();
+      final eid = r.i32(); // id
       r.i32(); // kind
       r.i32(); // team
-      final pos = FVec2(r.fixed(), r.fixed());
-      r.fixed(); r.fixed(); // vel
-      r.fixed(); // hp
-      r.fixed(); // maxHp
-      r.i32(); // attackCooldown
-      r.i32(); // gold
-      r.i32(); // respawnTimer
-      r.i32(); // attackTargetId
-      r.i32(); // statusElement
-      r.i32(); // statusTimer
-      r.i32(); // reactionIcd
-      r.i32(); // abilityCooldown
-      r.fixed(); r.fixed(); // target
+      FVec2? pos;
+      for (final c in _entityBodyCodecs) {
+        final v = c.read(r);
+        if (identical(c, _posCodec)) pos = v as FVec2;
+      }
       if (eid == id) return pos;
     }
-    return null; // not in snapshot (despawned / never spawned) — caller holds last
+    return null; // not in snapshot (despawned / never spawned)
   }
 }
