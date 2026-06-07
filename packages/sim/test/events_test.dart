@@ -13,4 +13,10 @@ void main() {
     expect(c.winnerTeam, 1);
     expect(<SimEvent>[d, k, t, c], hasLength(4));
   });
+
+  test('HeroDowned carries the downed hero id and is a SimEvent', () {
+    const e = HeroDowned(heroId: 1);
+    expect(e.heroId, 1);
+    expect(e, isA<SimEvent>());
+  });
 }

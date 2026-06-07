@@ -70,3 +70,12 @@ class LevelUp extends SimEvent {
   final int level;
   const LevelUp({required this.heroId, required this.level});
 }
+
+/// Emitted on the tick a hero transitions to downed (hp reaches 0). Off-wire /
+/// cosmetic like the other SimEvents (never serialized, never hashed). Lets the
+/// server cancel that hero's held order at the death tick so a respawn stands
+/// still (Plan 6).
+class HeroDowned extends SimEvent {
+  final int heroId;
+  const HeroDowned({required this.heroId});
+}
