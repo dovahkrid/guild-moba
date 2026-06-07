@@ -205,6 +205,9 @@ class Simulation {
       r.i32(); // kind
       r.i32(); // team
       FVec2? pos;
+      // pos is the first entry in _entityBodyCodecs; iterate ALL codecs to
+      // completion so the reader offset advances over the full per-entity record
+      // (incl. snapshot-only fields) to the next entity.
       for (final c in _entityBodyCodecs) {
         final v = c.read(r);
         if (identical(c, _posCodec)) pos = v as FVec2;

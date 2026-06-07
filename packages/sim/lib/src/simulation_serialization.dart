@@ -62,7 +62,7 @@ final _EntityFieldCodec _posCodec =
 /// byte-for-byte (pos, vel, hp, maxHp, attackCooldown, gold, respawnTimer,
 /// attackTargetId, statusElement, statusTimer, reactionIcd, abilityCooldown,
 /// target[snapshot-only]).
-final List<_EntityFieldCodec> _entityBodyCodecs = [
+final List<_EntityFieldCodec> _entityBodyCodecs = List.unmodifiable([
   _posCodec,
   _fvecCodec((e) => e.vel, (e, v) => e.vel = v),
   _fixedCodec((e) => e.hp, (e, v) => e.hp = v),
@@ -76,7 +76,7 @@ final List<_EntityFieldCodec> _entityBodyCodecs = [
   _i32Codec((e) => e.reactionIcd, (e, v) => e.reactionIcd = v),
   _i32Codec((e) => e.abilityCooldown, (e, v) => e.abilityCooldown = v),
   _fvecCodec((e) => e.target, (e, v) => e.target = v, snapshotOnly: true),
-];
+]);
 
 /// Binary serialization for [Simulation] (canonical determinism format +
 /// netcode wire/restore format), split out of simulation.dart (cleaning phase).
@@ -167,6 +167,10 @@ extension SimulationSerialization on Simulation {
     _winnerTeam = r.i32();
     final count = r.i32();
     final seen = <int>{};
+    // A malformed snapshot can make a codec read throw mid-entity, leaving that
+    // entity partially mutated. That is acceptable: a corrupt or version-
+    // mismatched snapshot (see the version check above) is a fatal condition,
+    // not a recoverable state.
     for (var i = 0; i < count; i++) {
       final id = r.i32();
       final kindIndex = r.i32();
