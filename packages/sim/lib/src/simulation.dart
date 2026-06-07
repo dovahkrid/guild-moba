@@ -231,7 +231,7 @@ class Simulation {
     for (final f in _fields) {
       if (f.timer > 0) f.timer -= 1;
     }
-    _stepFields(events); // field ticks coat units in range (may react — next task)
+    _stepFields(events); // field ticks coat units in range (and may detonate Vaporize)
     _fields.removeWhere((f) => f.timer <= 0); // expired fields gone (after their final tick)
     // Heroes attack ONLY their locked target, in ascending-id order. Pursue
     // (step 2) has already closed distance; here we just fire when in range.
