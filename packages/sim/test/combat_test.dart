@@ -303,4 +303,51 @@ void main() {
     expect(core!.teamId, 1);
     expect(sim.entityIdsSorted.contains(kCore1Id), isFalse);
   });
+
+  test('Plan 6: a killed hero drops its attack lock and stands at spawn after respawn', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final h1 = sim.entity(1);
+    h1.attackTargetId = 0; // was locked onto hero 0
+    h1.hp = Fixed.zero; // dies this tick
+    h1.pos = FVec2(Fixed.fromInt(1), Fixed.fromInt(7)); // off-lane, tower-safe
+    h1.target = h1.pos;
+    sim.entity(0).pos = FVec2(Fixed.fromInt(2), Fixed.fromInt(7)); // a valid nearby enemy
+    sim.entity(0).target = sim.entity(0).pos;
+    final ev = sim.step(0, const []);
+    expect(h1.respawnTimer, kHeroRespawnTicks);
+    expect(h1.attackTargetId, -1); // lock dropped on death
+    expect(ev.whereType<HeroDowned>().single.heroId, 1);
+    for (var t = 1; t <= kHeroRespawnTicks; t++) {
+      sim.step(t, const []);
+    }
+    expect(sim.entity(1).respawnTimer, 0); // respawned
+    expect(sim.entity(1).attackTargetId, -1); // still no lock
+    expect(sim.entity(1).pos.x.raw, kHero1SpawnX.raw); // stood at spawn (did NOT re-pursue)
+  });
+
+  test('Plan 6: HeroDowned fires once on the death transition, not on later downed ticks', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final h1 = sim.entity(1);
+    h1.hp = Fixed.zero;
+    h1.pos = FVec2(Fixed.fromInt(1), Fixed.fromInt(7));
+    h1.target = h1.pos;
+    sim.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero); // keep apart
+    sim.entity(0).target = sim.entity(0).pos;
+    expect(sim.step(0, const []).whereType<HeroDowned>().map((e) => e.heroId), [1]);
+    expect(sim.step(1, const []).whereType<HeroDowned>(), isEmpty); // not re-emitted while downed
+  });
+
+  test('Plan 6: a killed hero with a move target does not walk back after respawn', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final h1 = sim.entity(1);
+    h1.target = FVec2(Fixed.fromInt(-20), Fixed.zero); // had a move order toward the far side
+    h1.hp = Fixed.zero;
+    h1.pos = FVec2(Fixed.fromInt(1), Fixed.fromInt(7));
+    sim.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    for (var t = 0; t <= kHeroRespawnTicks; t++) {
+      sim.step(t, const []);
+    }
+    expect(sim.entity(1).pos.x.raw, kHero1SpawnX.raw); // stood at spawn, not at the old target
+  });
 }

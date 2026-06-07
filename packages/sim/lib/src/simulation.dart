@@ -264,17 +264,19 @@ class Simulation {
     // Despawn the dead, each via its own sweep: structures (towers/cores),
     // then heroes (downed, not removed), then creeps.
     _sweepDeadStructures(events);
-    _sweepDeadHeroes();
+    _sweepDeadHeroes(events);
     _sweepDeadCreeps(events);
   }
 
-  void _sweepDeadHeroes() {
+  void _sweepDeadHeroes(List<SimEvent> events) {
     for (final e in _entities) {
       if (e.kind != EntityKind.hero || e.respawnTimer != 0) continue;
       if (e.hp.raw > 0) continue;
       e.respawnTimer = kHeroRespawnTicks;
       e.pos = FVec2(_heroSpawnX(e), Fixed.zero); // park at base while downed
       e.target = e.pos;
+      e.attackTargetId = -1; // Plan 6: drop the attack lock so a respawn stands still
+      events.add(HeroDowned(heroId: e.id)); // off-wire: lets the server cancel the held order
     }
   }
 
