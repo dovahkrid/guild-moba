@@ -66,4 +66,11 @@ void main() {
     expect(e.reactionIcd, 0);
     expect(e.abilityCooldown, 0);
   });
+
+  test('IntentType appends ability without shifting existing indices', () {
+    expect(IntentType.none.index, 0);
+    expect(IntentType.move.index, 1);
+    expect(IntentType.attack.index, 2);
+    expect(IntentType.ability.index, 3); // left-click ability cast
+  });
 }

@@ -17,4 +17,16 @@ void main() {
     expect(r.sourceId, 0);
     expect(<SimEvent>[r], hasLength(1)); // still a SimEvent
   });
+
+  test('ElementalField holds owner, stationary center, element and timer', () {
+    final f = ElementalField(
+        ownerId: 0, center: FVec2(Fixed.fromInt(2), Fixed.zero),
+        element: Element.pyro.index, timer: 120);
+    expect(f.ownerId, 0);
+    expect(f.center.x.toDouble(), 2.0);
+    expect(f.element, Element.pyro.index);
+    expect(f.timer, 120);
+    f.timer -= 1; // timer is mutable (decremented each tick)
+    expect(f.timer, 119);
+  });
 }
