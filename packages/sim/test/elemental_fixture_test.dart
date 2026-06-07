@@ -8,6 +8,12 @@ void main() {
       Intent(playerSlot: 0, type: IntentType.move, aimX: 0, aimY: 458752, seq: 1),
       Intent(playerSlot: 1, type: IntentType.move, aimX: 0, aimY: 458752, seq: 1),
     ];
+    // Both heroes have walked to ~(0,7) and now cast at the same aim (0,7), so
+    // their fields overlap there. Hero 0 = Cinderfang (Pyro, self-placed at his
+    // feet) and hero 1 = Marisol (Hydro, placed at the aim) -> opposite elements
+    // overlapping at (0,7). Each hero standing in both fields is coated by the
+    // other's element and then Vaporizes. This is a real Pyro+Hydro reaction,
+    // not two same-element fields, which is why the overlap detonates below.
     const cast = [
       Intent(playerSlot: 0, type: IntentType.ability, aimX: 0, aimY: 458752, seq: 2),
       Intent(playerSlot: 1, type: IntentType.ability, aimX: 0, aimY: 458752, seq: 2),
