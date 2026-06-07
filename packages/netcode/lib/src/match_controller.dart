@@ -99,25 +99,32 @@ class MatchController {
         type: IntentType.ability.index);
   }
 
-  /// The held local intent in effect at tick [t] = latest pending with clientTick <= t.
-  Intent? _heldAt(int t) {
+  /// The local intents to apply at client tick [t]: the held move/attack (latest
+  /// pending with clientTick <= t, last-writer-wins) PLUS any one-shot ability
+  /// whose clientTick == t. Abilities are edge-triggered (fire once on their
+  /// issuing tick); move/attack persist. Used in BOTH forward prediction and
+  /// reconcile re-steps so prediction matches the server (which one-shots the
+  /// ability too). _pending is ordered by clientTick → the break is safe.
+  List<Intent> _intentsAt(int t) {
     Intent? held;
+    final out = <Intent>[];
     for (final p in _pending) {
-      if (p.clientTick <= t) {
-        held = p.intent;
+      if (p.clientTick > t) break;
+      if (p.intent.type == IntentType.ability) {
+        if (p.clientTick == t) out.add(p.intent); // one-shot: only on its issuing tick
       } else {
-        break;
+        held = p.intent; // latest move/attack persists
       }
     }
-    return held;
+    if (held != null) out.add(held);
+    return out;
   }
 
   /// Advance the predicted sim one tick (host calls at 30Hz). Collects reactions
   /// fired this tick (forward prediction only — reconcile re-steps do NOT collect,
   /// so a predicted reaction surfaces exactly once).
   void advanceClientTick() {
-    final held = _heldAt(_nextTick);
-    final events = _predicted.step(_nextTick, held == null ? const [] : [held]);
+    final events = _predicted.step(_nextTick, _intentsAt(_nextTick));
     final presentIds = _predicted.entityIdsSorted.toSet(); // snapshot once (entityIdsSorted re-sorts per call)
     for (final e in events) {
       if (e is! ReactionTriggered) continue;
@@ -169,8 +176,7 @@ class MatchController {
     // this re-step loop would need that state too.
     _predicted.restoreFromSnapshot(snap.stateBytes);
     for (var t = snap.serverTick + 1; t < _nextTick; t++) {
-      final held = _heldAt(t);
-      _predicted.step(t, held == null ? const [] : [held]);
+      _predicted.step(t, _intentsAt(t));
     }
 
     // Compute correction distance using Fixed.sqrt (pure, no dart:math).

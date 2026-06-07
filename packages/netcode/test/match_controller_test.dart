@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:netcode/netcode.dart';
 import 'package:protocol/protocol.dart';
 import 'package:sim/sim.dart';
@@ -87,5 +89,49 @@ void main() {
     final c = MatchController(seed: 1, localSlot: 0, startTick: 0);
     c.advanceClientTick();
     expect(c.drainReactions(), isEmpty);
+  });
+
+  test('one-shot ability: a single cast places ONE field and does NOT auto-recast after cooldown', () {
+    final c = MatchController(seed: 1, localSlot: 1, startTick: 0);
+    c.applyAbilityInput(0, 458752); // Marisol casts once at world (0,7) on tick 0
+    c.advanceClientTick(); // tick 0: the field is placed
+    expect(c.update(0).fields, hasLength(1)); // cast fired exactly once
+    // Advance through field expiry AND a full ability cooldown cycle.
+    for (var i = 0; i < kAbilityCooldownTicks + 5; i++) {
+      c.advanceClientTick();
+    }
+    expect(c.update(0).fields, isEmpty); // expired and NOT auto-recast (the bug)
+  });
+
+  test('held move persists across ticks while a one-shot ability fires once', () {
+    final c = MatchController(seed: 0, localSlot: 0, startTick: 0);
+    final startX = c.debugLocalPos().x.raw;
+    c.applyLocalInput(655360, 0); // move right (held)
+    c.applyAbilityInput(655360, 0); // and cast once (same tick 0)
+    for (var i = 0; i < 30; i++) {
+      c.advanceClientTick();
+    }
+    expect(c.debugLocalPos().x.raw, greaterThan(startX)); // kept moving (move is held)
+    expect(c.update(0).fields.where((f) => f.ownerId == 0), hasLength(1)); // one field (duration 120 > 30)
+  });
+
+  test('reconcile reproduces a SINGLE cast (no re-fire): exact hash match', () {
+    final server = Simulation.create(const SimConfig(seed: 1337));
+    final c = MatchController(seed: 1337, localSlot: 0, startTick: 0);
+    const cast = Intent(
+        playerSlot: 0, type: IntentType.ability, aimX: 0, aimY: 0, seq: 1, clientTick: 0);
+    c.applyAbilityInput(0, 0); // client casts at tick 0 (seq 1, clientTick 0)
+    Uint8List? snapBytes;
+    for (var t = 0; t < 10; t++) {
+      server.step(t, t == 0 ? const [cast] : const []); // server casts once at tick 0
+      if (t == 4) snapBytes = server.snapshotBytes(); // reconcile anchor (tick 4)
+      c.advanceClientTick();
+    }
+    // Snapshot at tick 4 acks the cast (seq 1) → client prunes it; reconcile
+    // restores the authoritative (single) field and re-steps 5..9 WITHOUT re-firing.
+    // Both server and client end at tick 9, so their canonical state must match.
+    final snap = SnapshotMsg(serverTick: 4, ackedSeq: const [1, 0], stateBytes: snapBytes!);
+    c.onServerSnapshot(snap);
+    expect(c.debugHash(), server.canonicalStateHash()); // EXACT: cast applied once, not re-fired
   });
 }
