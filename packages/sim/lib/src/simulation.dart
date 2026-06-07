@@ -40,6 +40,13 @@ class Simulation {
   final List<Entity> _entities;
   final Map<int, Entity> _byId;
 
+  // Last source id to damage each entity (for kill credit / the revenge-boss
+  // "debtor"). Transient; NOT serialized — a kill is resolved the same tick the
+  // lethal hit lands (the death sweep runs immediately after the attack loops in
+  // _stepCombat), so it never needs to survive a snapshot. Keeps byte layout
+  // unchanged.
+  final Map<int, int> _lastDamager = {};
+
   Simulation._(this._rng, this._entities)
       : _byId = {for (final e in _entities) e.id: e};
 
@@ -161,7 +168,77 @@ class Simulation {
       _applyDamage(e, tgt, kHeroAttackDamage, events);
       e.attackCooldown = kHeroAttackCooldownTicks;
     }
+    // Towers fire at the nearest enemy hero in range.
+    for (final id in entityIdsSorted) {
+      final e = _byId[id]!;
+      if (e.kind != EntityKind.tower || e.attackCooldown > 0 || e.hp.raw <= 0) continue;
+      final target = _acquireTowerTarget(e);
+      if (target == null) continue;
+      _applyDamage(e, target, kTowerAttackDamage, events);
+      e.attackCooldown = kTowerAttackCooldownTicks;
+    }
+    // Despawn dead structures (towers/cores). Heroes (Task 7) and creeps
+    // (Task 9) are handled by their own systems.
+    _sweepDeadStructures(events);
   }
+
+  Entity? _acquireTowerTarget(Entity tower) {
+    Entity? best;
+    Fixed bestSq = Fixed.zero;
+    for (final id in entityIdsSorted) {
+      final c = _byId[id]!;
+      if (c.kind != EntityKind.hero) continue;
+      if (c.teamId == tower.teamId || c.respawnTimer != 0 || c.hp.raw <= 0) continue;
+      final dsq = (c.pos - tower.pos).lengthSq();
+      if (dsq > kTowerAttackRangeSq) continue;
+      if (best == null || dsq < bestSq) {
+        best = c;
+        bestSq = dsq;
+      }
+    }
+    return best;
+  }
+
+  void _sweepDeadStructures(List<SimEvent> events) {
+    final dead = <Entity>[];
+    for (final e in _entities) {
+      if ((e.kind == EntityKind.tower || e.kind == EntityKind.core) && e.hp.raw <= 0) {
+        dead.add(e);
+      }
+    }
+    for (final e in dead) {
+      if (e.kind == EntityKind.tower) {
+        events.add(TowerDestroyed(
+            towerId: e.id, teamId: e.teamId, killerId: _lastDamagerOf(e.id)));
+      }
+      _removeEntity(e.id);
+    }
+  }
+
+  /// Ordered gating: outer towers always vulnerable; an inner tower only after
+  /// its team's outer tower is gone; a core only after BOTH its towers are gone.
+  bool isStructureVulnerable(Entity e) {
+    if (e.kind == EntityKind.tower) {
+      final isInner = e.id == kInnerTower0Id || e.id == kInnerTower1Id;
+      if (!isInner) return true; // outer
+      final outerId = e.teamId == 0 ? kOuterTower0Id : kOuterTower1Id;
+      return !_byId.containsKey(outerId);
+    }
+    if (e.kind == EntityKind.core) {
+      final outerId = e.teamId == 0 ? kOuterTower0Id : kOuterTower1Id;
+      final innerId = e.teamId == 0 ? kInnerTower0Id : kInnerTower1Id;
+      return !_byId.containsKey(outerId) && !_byId.containsKey(innerId);
+    }
+    return true; // heroes/creeps always damageable
+  }
+
+  void _removeEntity(int id) {
+    _entities.removeWhere((e) => e.id == id);
+    _byId.remove(id);
+    _lastDamager.remove(id);
+  }
+
+  int _lastDamagerOf(int id) => _lastDamager[id] ?? -1;
 
   /// Is `c` a valid attack target for attacker `a`?
   bool _isAttackable(Entity a, Entity c) {
@@ -173,7 +250,7 @@ class Simulation {
         return true; // neutral fodder — last-hittable by either hero
       case EntityKind.tower:
       case EntityKind.core:
-        return false; // structures become attackable in Task 6 (vulnerability gate)
+        return c.teamId != a.teamId && isStructureVulnerable(c);
       case EntityKind.wanderer:
         return false; // pure RNG probe — never a combat target
     }
@@ -186,6 +263,7 @@ class Simulation {
     var hp = target.hp - amount;
     if (hp.raw < 0) hp = Fixed.zero;
     target.hp = hp;
+    _lastDamager[target.id] = source.id;
     events.add(DamageDealt(
         sourceId: source.id, targetId: target.id, amountRaw: amount.raw));
     return hp.raw <= 0;

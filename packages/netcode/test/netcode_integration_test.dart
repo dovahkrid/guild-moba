@@ -28,8 +28,9 @@ void main() {
   test('case 1: zero-latency zero-loss baseline — correction == 0 on every reconcile',
       () {
     final t = _makeTransport(oneWayLatencyMs: 0, lossRate: 0.0);
-    // Apply a move so the hero walks somewhere.
-    final msg = t.client.applyLocalInput(655360, 0);
+    // Apply a move so the hero walks somewhere — onto its OWN (left) half so it
+    // never enters the enemy outer tower's range (x=+4, range 6): stays combat-free.
+    final msg = t.client.applyLocalInput(-655360, 0); // → x=-10
     t.clientSend(msg);
 
     var reconciled = false;
@@ -51,16 +52,16 @@ void main() {
     final t = _makeTransport(oneWayLatencyMs: 75);
 
     // Apply a move that makes the hero move to a specific target.
-    // The hero starts at x = Fixed.fromInt(-8) and target defaults to FVec2.zero.
-    // Use a target well within range so hero reaches it within ~40 ticks.
-    final msg = t.client.applyLocalInput(Fixed.fromInt(0).raw, Fixed.fromInt(0).raw);
+    // The hero starts at x = Fixed.fromInt(-8). Target a point on its OWN (left)
+    // half (x=-12) so it never enters the enemy tower's range — combat-free.
+    final msg = t.client.applyLocalInput(Fixed.fromInt(-12).raw, Fixed.fromInt(0).raw);
     t.clientSend(msg);
 
     var maxCorrectionInMotion = 0.0;
     var steadyStateCorrection = -1.0;
 
-    // Run 120 ticks. Hero should reach target (0, 0) within ~60 ticks from (-8, 0)
-    // at 0.15 world units/tick: 8/0.15 = ~54 ticks.
+    // Run 120 ticks. Hero should reach target (-12, 0) within ~30 ticks from (-8, 0)
+    // at 0.15 world units/tick: 4/0.15 = ~27 ticks.
     for (var i = 0; i < 120; i++) {
       t.tickWorld();
       if (t.client.lastServerTick >= 0) {
@@ -85,7 +86,7 @@ void main() {
             reason: 'correction must not grow (got $d at server-tick ${t.client.lastServerTick})');
         // After reaching steady state, must be exactly 0.
         if (i >= 10) {
-          // Hero has definitely settled (hero step 0.15, distance ~8 → ~54 ticks to reach;
+          // Hero has definitely settled (hero step 0.15, distance ~4 → ~27 ticks to reach;
           // with 120+10 ticks passed the hero is long settled).
           steadyStateCorrection = d;
           expect(d, equals(0.0),
@@ -107,13 +108,14 @@ void main() {
       () {
     final t = _makeTransport(oneWayLatencyMs: 75);
 
-    // Two distinct aim points to alternate between. Using x=0.0 vs x=0.5 (Fixed
-    // Q16.16 = 0 vs 32768) keeps the per-reconcile correction well under 0.5
-    // (max ≈ one heroStep = 0.15) while the target IS different on every alternate
-    // input — guaranteeing correction > 0 on most reconciles and proving that
-    // continuous correction is bounded.
-    final aimA = 0;       // x=0.0 (Fixed Q16.16)
-    final aimB = 32768;   // x=0.5
+    // Two distinct aim points to alternate between, both on the local hero's OWN
+    // (left) half (x=-12.0 vs x=-11.5) so it never enters the enemy tower's range
+    // — combat-free. They are only 0.5 apart so the per-reconcile correction stays
+    // well under 0.5 (max ≈ one heroStep = 0.15) while the target IS different on
+    // every alternate input — guaranteeing correction > 0 on most reconciles and
+    // proving continuous correction is bounded.
+    final aimA = Fixed.fromNum(-12.0).raw; // x=-12.0 (Fixed Q16.16)
+    final aimB = Fixed.fromNum(-11.5).raw; // x=-11.5
 
     var maxCorrectionObserved = 0.0;
     var correctionObservedCount = 0;
@@ -159,17 +161,18 @@ void main() {
   test('case 3: 30% packet loss — correction bounded, pendingCount bounded', () {
     final t = _makeTransport(lossRate: 0.30);
 
-    // Send initial move.
-    final msg = t.client.applyLocalInput(655360, 0);
+    // Send initial move onto the local hero's OWN (left) half — combat-free.
+    final msg = t.client.applyLocalInput(-655360, 0); // → x=-10
     t.clientSend(msg);
 
     // Two distinct aim points that change the target meaningfully but keep the
-    // per-reconcile correction bounded < 0.5. Using x=0.0 vs x=0.5 (Fixed Q16.16)
-    // ensures pendingCount is genuinely non-trivial under loss (new intent each
-    // 10 frames, some get dropped, so pending accumulates) while correction stays
-    // well under the 0.5 bound (correction ≈ 1 heroStep = 0.15).
-    final aimA = 0;       // x=0.0 (Fixed Q16.16)
-    final aimB = 32768;   // x=0.5
+    // per-reconcile correction bounded < 0.5. Both sit on the local hero's OWN
+    // (left) half (x=-12.0 vs x=-11.5) so it never enters the enemy tower's range —
+    // combat-free. They are only 0.5 apart so pendingCount is genuinely non-trivial
+    // under loss (new intent each 10 frames, some get dropped, so pending
+    // accumulates) while correction stays well under the 0.5 bound (≈ 1 heroStep = 0.15).
+    final aimA = Fixed.fromNum(-12.0).raw; // x=-12.0 (Fixed Q16.16)
+    final aimB = Fixed.fromNum(-11.5).raw; // x=-11.5
 
     for (var i = 0; i < 200; i++) {
       // Send a new target-changing input every ~10 frames so pendingCount
@@ -197,7 +200,8 @@ void main() {
     final t = _makeTransport(oneWayLatencyMs: 75, lossRate: 0.0);
 
     // Apply an intent but DON'T send it (simulate drop before send).
-    t.client.applyLocalInput(655360, 0);
+    // Move onto the local hero's OWN (left) half — combat-free.
+    t.client.applyLocalInput(-655360, 0); // → x=-10
     // Do NOT call t.clientSend.
 
     // Advance a few ticks, then send a second intent (same direction).
@@ -206,18 +210,18 @@ void main() {
     }
 
     // Send the second intent to the server — this is the "re-send" / next input.
-    final msg2 = t.client.applyLocalInput(655360, 0);
+    final msg2 = t.client.applyLocalInput(-655360, 0); // → x=-10
     t.clientSend(msg2);
 
     for (var i = 0; i < 115; i++) {
       t.tickWorld();
     }
 
-    // Hero should have moved right (server received the second intent).
+    // Hero should have moved left (server received the second intent).
     // Client prediction and server should both show movement.
     final clientPos = t.client.debugLocalPos();
-    expect(clientPos.x.raw, greaterThan(Fixed.fromInt(-8).raw),
-        reason: 'hero should have moved right despite dropped first input');
+    expect(clientPos.x.raw, lessThan(Fixed.fromInt(-8).raw),
+        reason: 'hero should have moved left despite dropped first input');
 
     // No permanent desync: correction should eventually settle to 0.
     if (t.client.lastServerTick >= 0) {
@@ -318,8 +322,9 @@ void main() {
   test('case 7: opponent interpolation pos lies between bracketing snapshots (moving opponent)', () {
     final t = _makeTransport(oneWayLatencyMs: 75);
 
-    // Also move the client hero so snapshots are more interesting.
-    final msg = t.client.applyLocalInput(Fixed.fromInt(0).raw, 0);
+    // Also move the client hero so snapshots are more interesting — onto its OWN
+    // (left) half (x=-12) so it stays out of the enemy tower's range (combat-free).
+    final msg = t.client.applyLocalInput(Fixed.fromInt(-12).raw, 0);
     t.clientSend(msg);
 
     // Drive the opponent in a straight line (+x direction) for many frames.
@@ -397,7 +402,7 @@ void main() {
   test('case 8: identical seed → identical client hash (determinism)', () {
     int runHash(int seed) {
       final t = _makeTransport(seed: seed, oneWayLatencyMs: 75, lossRate: 0.10);
-      final msg = t.client.applyLocalInput(655360, 131072);
+      final msg = t.client.applyLocalInput(-655360, 131072); // → (x=-10, y=2): own half, combat-free
       t.clientSend(msg);
       for (var i = 0; i < 80; i++) {
         t.tickWorld();
@@ -421,8 +426,9 @@ void main() {
     // Run the transport for a while with a known input sequence.
     final t = _makeTransport(oneWayLatencyMs: 0, lossRate: 0.0);
 
-    // Send one explicit move input at the start.
-    final msg = t.client.applyLocalInput(655360, 0);
+    // Send one explicit move input at the start — onto the local hero's OWN
+    // (left) half (x=-10) so it stays out of the enemy tower's range (combat-free).
+    final msg = t.client.applyLocalInput(-655360, 0); // → x=-10
     t.clientSend(msg);
 
     // Run until stable (hero reaches target).

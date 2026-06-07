@@ -39,8 +39,10 @@ void main() {
 
   test('unlocked adjacent heroes do NOT attack; locking deals damage + sets the lock', () {
     final sim = Simulation.create(const SimConfig(seed: 1));
-    sim.entity(0).pos = const FVec2(Fixed.zero, Fixed.zero);
-    sim.entity(1).pos = FVec2(Fixed.fromInt(1), Fixed.zero);
+    // Place the pair off-lane at y=7 so neither hero sits in any tower's range
+    // (towers at x=±4/±10, range 6) — keeps this hero-vs-hero test combat-free.
+    sim.entity(0).pos = FVec2(Fixed.zero, Fixed.fromInt(7));
+    sim.entity(1).pos = FVec2(Fixed.fromInt(1), Fixed.fromInt(7));
     sim.entity(0).target = sim.entity(0).pos;
     sim.entity(1).target = sim.entity(1).pos;
     sim.step(0, const []); // neither locked -> no attack (manual-only)
@@ -101,5 +103,52 @@ void main() {
     ]);
     expect(sim.entity(kWandererEntityId).hp.raw, hpBefore); // wanderer never a target
     expect(sim.entity(0).attackTargetId, -1); // invalid lock dropped
+  });
+
+  test('outer tower is vulnerable; inner is not until outer falls; core last', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    expect(sim.isStructureVulnerable(sim.entity(kOuterTower1Id)), isTrue);
+    expect(sim.isStructureVulnerable(sim.entity(kInnerTower1Id)), isFalse);
+    expect(sim.isStructureVulnerable(sim.entity(kCore1Id)), isFalse);
+  });
+
+  test('a hero attacks a vulnerable enemy outer tower in range', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    // Put hero 0 next to team1 outer tower (+4,0).
+    sim.entity(0).pos = FVec2(Fixed.fromInt(3), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    sim.entity(1).pos = FVec2(Fixed.fromInt(40), Fixed.zero); // keep opp away
+    sim.entity(1).target = sim.entity(1).pos;
+    // Hero 0 right-clicks (locks) the enemy outer tower.
+    sim.step(0, const [Intent(playerSlot: 0, type: IntentType.attack, aimX: kOuterTower1Id, seq: 1)]);
+    expect(sim.entity(kOuterTower1Id).hp.toDouble(), lessThan(kOuterTowerMaxHp.toDouble()));
+  });
+
+  test('a tower shoots an enemy hero in range', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    // Hero 1 stands next to team0 outer tower (-4,0); keep hero 0 far.
+    sim.entity(1).pos = FVec2(Fixed.fromInt(-3), Fixed.zero);
+    sim.entity(1).target = sim.entity(1).pos;
+    sim.entity(0).pos = FVec2(Fixed.fromInt(-40), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    sim.step(0, const []);
+    expect(sim.entity(1).hp.toDouble(), lessThan(kHeroMaxHp.toDouble()));
+  });
+
+  test('destroying the outer tower despawns it, opens the inner, emits TowerDestroyed', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final tower = sim.entity(kOuterTower1Id);
+    tower.hp = kHeroAttackDamage; // exactly one hero hit kills it this tick
+    sim.entity(0).pos = FVec2(Fixed.fromInt(3), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    sim.entity(1).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(1).target = sim.entity(1).pos;
+    // Hero 0 locks the 10-hp outer tower; one hit kills it this tick.
+    final events = sim.step(0, const [Intent(playerSlot: 0, type: IntentType.attack, aimX: kOuterTower1Id, seq: 1)]);
+    expect(sim.entityIdsSorted.contains(kOuterTower1Id), isFalse); // despawned
+    expect(sim.isStructureVulnerable(sim.entity(kInnerTower1Id)), isTrue);
+    final td = events.whereType<TowerDestroyed>().single;
+    expect(td.towerId, kOuterTower1Id);
+    expect(td.killerId, 0);
   });
 }
