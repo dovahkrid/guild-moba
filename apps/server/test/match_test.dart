@@ -95,6 +95,70 @@ void main() {
     expect(sim.fields.where((f) => f.ownerId == 1), isEmpty); // expired, not recast
   });
 
+  test('Plan 6: a held move order is cancelled when the hero dies — stands at spawn after respawn', () {
+    final driver = FakeTickDriver();
+    final p0 = FakePlayerConn(), p1 = FakePlayerConn();
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    sim.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero); // keep hero 0 away
+    sim.entity(0).target = sim.entity(0).pos;
+    sim.entity(1).pos = FVec2(Fixed.fromInt(8), Fixed.fromInt(7)); // hero 1 tower-safe
+    sim.entity(1).target = sim.entity(1).pos;
+    Match(seed: 1, sim: sim, driver: driver)
+      ..addPlayer(0, p0)
+      ..addPlayer(1, p1)
+      ..start();
+    // Hero 1 orders a move far to the left (held), then moves a bit.
+    p1.receive(ProtocolCodec.encode(const InputMsg(
+        slot: 1, seq: 1, clientTick: 0, aimX: -1310720, aimY: 458752, type: 1)));
+    driver.pump(3);
+    expect(sim.entity(1).pos.x.toDouble(), lessThan(8.0)); // it moved left
+    // Now hero 1 takes a lethal hit (from anywhere).
+    sim.entity(1).hp = Fixed.zero;
+    driver.pump(1); // death tick → HeroDowned → clearSlot(1)
+    expect(sim.entity(1).respawnTimer, kHeroRespawnTicks);
+    driver.pump(kHeroRespawnTicks); // run out the timer
+    expect(sim.entity(1).respawnTimer, 0);
+    expect(sim.entity(1).pos.x.raw, kHero1SpawnX.raw); // stood at spawn (held order cancelled)
+  });
+
+  test('Plan 6: input arriving while a hero is downed is ignored (no order on respawn)', () {
+    final driver = FakeTickDriver();
+    final p0 = FakePlayerConn(), p1 = FakePlayerConn();
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    sim.entity(0).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(0).target = sim.entity(0).pos;
+    sim.entity(1).hp = Fixed.zero; // hero 1 downs on tick 0
+    sim.entity(1).pos = FVec2(Fixed.fromInt(8), Fixed.fromInt(7));
+    sim.entity(1).target = sim.entity(1).pos;
+    Match(seed: 1, sim: sim, driver: driver)
+      ..addPlayer(0, p0)
+      ..addPlayer(1, p1)
+      ..start();
+    driver.pump(1);
+    expect(sim.entity(1).respawnTimer, kHeroRespawnTicks); // downed
+    // While downed, hero 1 clicks a move far away — must be IGNORED.
+    p1.receive(ProtocolCodec.encode(const InputMsg(
+        slot: 1, seq: 1, clientTick: 0, aimX: -1310720, aimY: 0, type: 1)));
+    driver.pump(kHeroRespawnTicks);
+    expect(sim.entity(1).respawnTimer, 0);
+    expect(sim.entity(1).pos.x.raw, kHero1SpawnX.raw); // stood still: the downed click was dropped
+  });
+
+  test('Plan 6: an ALIVE hero keeps its held move re-fed every tick', () {
+    final driver = FakeTickDriver();
+    final p0 = FakePlayerConn(), p1 = FakePlayerConn();
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    Match(seed: 1, sim: sim, driver: driver)
+      ..addPlayer(0, p0)
+      ..addPlayer(1, p1)
+      ..start();
+    final startX = sim.entity(0).pos.x.raw;
+    p0.receive(ProtocolCodec.encode(const InputMsg(
+        slot: 0, seq: 1, clientTick: 0, aimX: 655360, aimY: 0, type: 1))); // move right, once
+    driver.pump(10); // no further input; the held move must keep re-feeding
+    expect(sim.entity(0).pos.x.raw, greaterThan(startX));
+  });
+
   test('core destroyed ends the match and notifies BOTH players with the winner', () {
     final driver = FakeTickDriver();
     final p0 = FakePlayerConn(), p1 = FakePlayerConn();

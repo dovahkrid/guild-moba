@@ -40,6 +40,7 @@ class Match {
         return; // malformed frame: ignore, keep the match alive
       }
       if (msg is InputMsg) {
+        if (_sim.entity(slot).isDowned) return; // Plan 6: dead heroes take no orders
         // Server is authoritative on slot: stamp with the assigned slot.
         _buffer.accept(InputMsg(
           slot: slot,
@@ -68,7 +69,10 @@ class Match {
   void _tick() {
     if (ended) return;
     final intents = _buffer.drainForTick();
-    _sim.step(_currentTick, intents);
+    final events = _sim.step(_currentTick, intents);
+    for (final e in events) {
+      if (e is HeroDowned) _buffer.clearSlot(e.heroId); // death cancels the held order
+    }
     if (_sim.winnerTeam != -1) {
       // Ends before incrementing _currentTick; the terminal snapshot is tick N.
       _endWithWin(_sim.winnerTeam);
