@@ -14,7 +14,6 @@ final Fixed kVaporizeMult = Fixed.fromNum(1.3);
 // --- Neutral fields (coat-only; no DoT in v2) ---
 final Fixed kFieldRadius = Fixed.fromNum(2.5);
 final Fixed kFieldRadiusSq = Fixed.fromNum(2.5 * 2.5); // compare vs lengthSq, no sqrt
-final Fixed kFieldDotDamage = Fixed.fromNum(1); // DEPRECATED (Plan 4 DoT); removed in Plan 5 Task 2
 const int kFieldDurationTicks = 120; // ~4s
 const int kAbilityCooldownTicks = 240; // ~8s (> field duration → ≤1 active field/hero)
 

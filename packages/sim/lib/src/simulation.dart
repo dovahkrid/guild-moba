@@ -126,6 +126,8 @@ class Simulation {
             element: heroElement(hero.id),
             timer: kFieldDurationTicks));
         hero.abilityCooldown = kAbilityCooldownTicks;
+        // Plan 5: a one-time ENEMY-ONLY burst centered on the field (own-team safe).
+        _castBurst(hero, center, heroElement(hero.id), events);
       }
     }
 
@@ -396,11 +398,13 @@ class Simulation {
     return hp.raw <= 0;
   }
 
-  /// Element-application chokepoint (Plan 4). Autos + field ticks route through
-  /// here; towers (non-elemental) call _applyDamage directly. Only heroes/creeps
-  /// carry status. A 0-damage coat (a creep field tick) skips _applyDamage so it
-  /// neither last-hits nor spams DamageDealt. A differing element on an already-
-  /// coated, ICD-ready unit detonates Vaporize (amplify + consume + emit).
+  /// Element-application chokepoint for DAMAGING hits (Plan 5). Autos and the
+  /// enemy-only cast burst route through here; towers (non-elemental) call
+  /// _applyDamage directly; field ticks coat/react INLINE in _stepFields (they no
+  /// longer route here). Only heroes/creeps carry status. A different element on an
+  /// already-coated, ICD-ready unit detonates an attack-amplify Vaporize
+  /// (×kVaporizeMult on the triggering hit + consume + ICD + emit). Callers only
+  /// ever pass ENEMY targets, so the amplified damage is inherently self-safe.
   void _applyHit(
       Entity source, Entity target, Fixed baseDamage, int element, List<SimEvent> events) {
     if (target.kind != EntityKind.hero && target.kind != EntityKind.creep) {
@@ -431,24 +435,67 @@ class Simulation {
     if (dmg.raw > 0) _applyDamage(source, target, dmg, events);
   }
 
-  /// Field ticks: every active field coats each hero/creep within its radius
-  /// (2-sided — the owner is not exempt). DoT is real on heroes, ZERO on creeps
-  /// (coat-not-farm). Iterates entityIdsSorted for determinism.
+  /// Field ticks (Plan 5): every active field, in stable list order, processes
+  /// each hero/creep within its radius (2-sided — the owner is not exempt). A
+  /// field deals NO DoT. If the unit carries a DIFFERENT element and its ICD is
+  /// ready it detonates a field-overlap Vaporize: status consumed, ICD stamped,
+  /// ReactionTriggered emitted (multiplierRaw 0 = "flat"), and FLAT
+  /// kReactionFlatDamage dealt — but ONLY to an enemy of the field owner
+  /// (owner/own-team take 0; the self-safety invariant). Otherwise the unit is
+  /// coated (set/refresh, no damage). Iterates entityIdsSorted for determinism.
   void _stepFields(List<SimEvent> events) {
     for (final f in _fields) {
+      // Owner is always a hero, and heroes are downed-not-removed, so
+      // _byId[f.ownerId] is non-null while the field is alive: the respawn block
+      // clears _fields for any returning hero, and _removeEntity (creeps/
+      // structures) never touches _fields.
+      final owner = _byId[f.ownerId]!;
       for (final id in entityIdsSorted) {
         final u = _byId[id]!;
         if (u.kind != EntityKind.hero && u.kind != EntityKind.creep) continue;
         if (u.hp.raw <= 0) continue;
         if (u.kind == EntityKind.hero && u.respawnTimer != 0) continue; // downed
         if ((u.pos - f.center).lengthSq() > kFieldRadiusSq) continue;
-        final dot = u.kind == EntityKind.creep ? Fixed.zero : kFieldDotDamage;
-        // Owner is always a hero, and heroes are downed-not-removed, so
-        // _byId[f.ownerId] is non-null while the field is alive: the respawn
-        // block clears _fields for any returning hero, and _removeEntity (creeps/
-        // structures) never touches _fields.
-        _applyHit(_byId[f.ownerId]!, u, dot, f.element, events);
+        if (u.statusElement != -1 &&
+            u.statusElement != f.element &&
+            u.reactionIcd == 0) {
+          // Field-overlap Vaporize. Fires 2-sided (consume + ICD + event); damage
+          // lands ONLY on an enemy of the owner (own-team takes 0).
+          u.statusElement = -1;
+          u.statusTimer = 0;
+          u.reactionIcd = kReactionIcdTicks;
+          events.add(ReactionTriggered(
+              unitId: u.id,
+              reaction: Reaction.vaporize.index,
+              multiplierRaw: 0, // flat: no triggering hit to amplify
+              sourceId: f.ownerId));
+          if (u.teamId != owner.teamId) {
+            _applyDamage(owner, u, kReactionFlatDamage, events);
+          }
+        } else {
+          // Coat (set/refresh). No damage. 2-sided. A different element suppressed
+          // by an active ICD also lands here (overwrites; ICD gates only detonation).
+          u.statusElement = f.element;
+          u.statusTimer = kStatusDurationTicks;
+        }
       }
+    }
+  }
+
+  /// Cast burst (Plan 5): a one-time ENEMY-ONLY AoE hit centered on a freshly
+  /// placed field. Routes each enemy hero/creep in radius through _applyHit, so it
+  /// applies the caster's element AND triggers an attack-amplify Vaporize
+  /// (×kVaporizeMult) on an already-differently-coated enemy. Own-team is excluded
+  /// → self-safe. Iterates entityIdsSorted for determinism.
+  void _castBurst(Entity caster, FVec2 center, int element, List<SimEvent> events) {
+    for (final id in entityIdsSorted) {
+      final u = _byId[id]!;
+      if (u.kind != EntityKind.hero && u.kind != EntityKind.creep) continue;
+      if (u.hp.raw <= 0) continue;
+      if (u.kind == EntityKind.hero && u.respawnTimer != 0) continue; // downed
+      if (u.teamId == caster.teamId) continue; // ENEMY-ONLY (own-team safe)
+      if ((u.pos - center).lengthSq() > kFieldRadiusSq) continue;
+      _applyHit(caster, u, kCastBurstDamage, element, events);
     }
   }
 

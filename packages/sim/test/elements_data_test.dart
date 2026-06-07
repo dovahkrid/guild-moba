@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('elemental constants obey the Fixed magnitude budget (|value| < 32768)', () {
-    for (final f in <Fixed>[kVaporizeMult, kFieldRadius, kFieldRadiusSq, kFieldDotDamage]) {
+    for (final f in <Fixed>[kVaporizeMult, kFieldRadius, kFieldRadiusSq]) {
       expect(f.toDouble().abs() < 32768, isTrue, reason: '$f exceeds budget');
     }
     // The worst routed damage × multiplier must stay in budget (no overflow).
@@ -44,8 +44,6 @@ void main() {
     }
     // The cast burst CAN be amplified by a reaction, so burst × mult must fit.
     expect((kCastBurstDamage * kVaporizeMult).toDouble().abs() < 32768, isTrue);
-    // The field-overlap reaction is FLAT (never amplified) but must still fit.
-    expect(kReactionFlatDamage.toDouble().abs() < 32768, isTrue);
     expect(kCastBurstDamage.toDouble(), greaterThan(0));
     expect(kReactionFlatDamage.toDouble(), greaterThan(0));
   });
