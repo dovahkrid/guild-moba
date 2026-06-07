@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'data/combat.dart';
+import 'events.dart';
 import 'math/det_rng.dart';
 import 'math/fixed.dart';
 import 'math/fvec2.dart';
@@ -72,31 +73,55 @@ class Simulation {
   List<int> get entityIdsSorted => _entities.map((e) => e.id).toList()..sort();
   Entity entity(int id) => _byId[id]!;
 
-  /// Advance one fixed tick. `intents` are applied in a canonical order so the
-  /// result never depends on arrival order.
-  void step(int currentTick, List<Intent> intents) {
+  /// Advance one fixed tick. Returns cosmetic-only events (never mutate state).
+  List<SimEvent> step(int currentTick, List<Intent> intents) {
     tick = currentTick;
+    final events = <SimEvent>[];
 
+    // 1. Apply intents (canonical order; downed heroes ignore input).
+    //    move   -> set the move target AND clear the attack lock.
+    //    attack -> set the attack lock to the target entity id (carried in aimX).
     final ordered = [...intents]..sort((a, b) =>
         a.playerSlot != b.playerSlot ? a.playerSlot - b.playerSlot : a.seq - b.seq);
     for (final it in ordered) {
-      if (it.type == IntentType.move && it.playerSlot >= 0 && it.playerSlot < 2) {
-        final hero = _byId[it.playerSlot]!;
+      if (it.playerSlot < 0 || it.playerSlot >= 2) continue;
+      final hero = _byId[it.playerSlot]!;
+      if (hero.respawnTimer != 0) continue; // downed: ignore input
+      if (it.type == IntentType.move) {
         hero.target = FVec2(Fixed.raw(it.aimX), Fixed.raw(it.aimY));
+        hero.attackTargetId = -1;
+      } else if (it.type == IntentType.attack) {
+        hero.attackTargetId = it.aimX; // aimX carries the target entity id
       }
     }
 
-    // Heroes seek their target by a capped per-axis step.
+    // 2. Resolve pursue: a hero locked onto a valid enemy seeks its position;
+    //    an invalid lock is dropped and the hero holds.
     for (final e in _entities) {
-      if (e.kind != EntityKind.hero) continue;
+      if (e.kind != EntityKind.hero || e.respawnTimer != 0) continue;
+      if (e.attackTargetId == -1) continue;
+      final tgt = _byId[e.attackTargetId];
+      if (tgt == null || !_isAttackable(e, tgt)) {
+        e.attackTargetId = -1;
+        e.target = e.pos; // hold position
+      } else {
+        e.target = tgt.pos; // pursue the locked target
+      }
+    }
+
+    // 3. Hero movement (alive heroes seek their resolved target).
+    for (final e in _entities) {
+      if (e.kind != EntityKind.hero || e.respawnTimer != 0) continue;
       e.pos = FVec2(
         _stepToward(e.pos.x, e.target.x, _kHeroStep),
         _stepToward(e.pos.y, e.target.y, _kHeroStep),
       );
     }
 
-    // The wanderer drifts by an RNG-derived direction — puts the RNG through
-    // the determinism gate every tick.
+    // 4. Combat: cooldowns + instantaneous damage (heroes hit only their lock).
+    _stepCombat(events);
+
+    // 5. The wanderer drifts LAST — keeps the RNG through the gate every tick.
     final w = _byId[kWandererEntityId]!;
     final dx = _rng.nextInt(3) - 1; // -1, 0, +1
     final dy = _rng.nextInt(3) - 1;
@@ -104,6 +129,8 @@ class Simulation {
       w.pos.x + Fixed.fromInt(dx) * _kWanderStep,
       w.pos.y + Fixed.fromInt(dy) * _kWanderStep,
     );
+
+    return events;
   }
 
   Fixed _stepToward(Fixed cur, Fixed target, Fixed step) {
@@ -111,6 +138,53 @@ class Simulation {
     if (diff > step) return cur + step;
     if (-diff > step) return cur - step;
     return target;
+  }
+
+  void _stepCombat(List<SimEvent> events) {
+    // Tick cooldowns down for every combatant first.
+    for (final e in _entities) {
+      if (e.attackCooldown > 0) e.attackCooldown -= 1;
+    }
+    // Heroes attack ONLY their locked target, in ascending-id order. Pursue
+    // (step 2) has already closed distance; here we just fire when in range.
+    for (final id in entityIdsSorted) {
+      final e = _byId[id]!;
+      if (e.kind != EntityKind.hero || e.respawnTimer != 0 || e.hp.raw <= 0) continue;
+      if (e.attackCooldown > 0 || e.attackTargetId == -1) continue;
+      final tgt = _byId[e.attackTargetId];
+      if (tgt == null || !_isAttackable(e, tgt)) continue;
+      if ((tgt.pos - e.pos).lengthSq() > kHeroAttackRangeSq) continue; // not yet in range
+      _applyDamage(e, tgt, kHeroAttackDamage, events);
+      e.attackCooldown = kHeroAttackCooldownTicks;
+    }
+  }
+
+  /// Is `c` a valid attack target for attacker `a`?
+  bool _isAttackable(Entity a, Entity c) {
+    if (identical(a, c) || c.hp.raw <= 0) return false;
+    switch (c.kind) {
+      case EntityKind.hero:
+        return c.teamId != a.teamId && c.respawnTimer == 0;
+      case EntityKind.creep:
+        return true; // neutral fodder — last-hittable by either hero
+      case EntityKind.tower:
+      case EntityKind.core:
+        return false; // structures become attackable in Task 6 (vulnerability gate)
+      case EntityKind.wanderer:
+        return false; // pure RNG probe — never a combat target
+    }
+  }
+
+  /// The single damage chokepoint. Plan 4 wraps this to add elemental flavor +
+  /// reaction multipliers. Clamps hp to [0, maxHp]; returns true if lethal.
+  bool _applyDamage(Entity source, Entity target, Fixed amount, List<SimEvent> events) {
+    if (target.hp.raw <= 0) return false;
+    var hp = target.hp - amount;
+    if (hp.raw < 0) hp = Fixed.zero;
+    target.hp = hp;
+    events.add(DamageDealt(
+        sourceId: source.id, targetId: target.id, amountRaw: amount.raw));
+    return hp.raw <= 0;
   }
 
   /// Canonical, integer-only, ordered byte encoding of the full state.
