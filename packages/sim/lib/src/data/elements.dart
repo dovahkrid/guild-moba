@@ -9,12 +9,12 @@ const int kStatusDurationTicks = 45; // ~1.5s LIGHT status
 const int kReactionIcdTicks = 15; // ~0.5s per-unit reaction internal cooldown
 
 // --- Vaporize (amplify; spec §3.3 committed field-cap multiplier) ---
-final Fixed kVaporizeMult = Fixed.fromNum(1.3);
+final Fixed kVaporizeMult = Fixed.fromNum(1.3); // damage multiplier applied to Vaporize trigger
 
 // --- Neutral fields (coat-only; no DoT in v2) ---
-final Fixed kFieldRadius = Fixed.fromNum(2.5);
+final Fixed kFieldRadius = Fixed.fromNum(2.5); // world-units
 final Fixed kFieldRadiusSq = Fixed.fromNum(2.5 * 2.5); // compare vs lengthSq, no sqrt
-const int kFieldDurationTicks = 120; // ~4s
+const int kFieldDurationTicks = 120; // ~4s; field lingers to coat entering units
 const int kAbilityCooldownTicks = 240; // ~8s (> field duration → ≤1 active field/hero)
 
 // --- Plan 5 damage model (v2) ---

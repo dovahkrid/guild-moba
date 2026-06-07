@@ -7,27 +7,27 @@ import '../math/fixed.dart';
 const int kTicksPerSecond = 30; // server tick rate; seconds × 30 = ticks.
 
 // --- Hero auto-attack ---
-final Fixed kHeroMaxHp = Fixed.fromInt(100);
-final Fixed kHeroAttackRange = Fixed.fromNum(3);
+final Fixed kHeroMaxHp = Fixed.fromInt(100); // hit-points at full health
+final Fixed kHeroAttackRange = Fixed.fromNum(3); // world-units
 final Fixed kHeroAttackRangeSq = Fixed.fromNum(3 * 3); // compare vs lengthSq, no sqrt
-final Fixed kHeroAttackDamage = Fixed.fromNum(8);
+final Fixed kHeroAttackDamage = Fixed.fromNum(8); // damage per auto-attack hit
 const int kHeroAttackCooldownTicks = 18; // ~0.6s
 const int kHeroRespawnTicks = 150; // 5s
 
 // --- Towers (spec §6 targets: outer 1800/120/1.0/~6, inner 2400/150/1.1/~6) ---
-final Fixed kOuterTowerMaxHp = Fixed.fromInt(600);
-final Fixed kInnerTowerMaxHp = Fixed.fromInt(800);
-final Fixed kTowerAttackRange = Fixed.fromNum(6);
-final Fixed kTowerAttackRangeSq = Fixed.fromNum(6 * 6);
-final Fixed kTowerAttackDamage = Fixed.fromNum(20);
+final Fixed kOuterTowerMaxHp = Fixed.fromInt(600); // hit-points (outer/front tower)
+final Fixed kInnerTowerMaxHp = Fixed.fromInt(800); // hit-points (inner/base tower)
+final Fixed kTowerAttackRange = Fixed.fromNum(6); // world-units
+final Fixed kTowerAttackRangeSq = Fixed.fromNum(6 * 6); // compare vs lengthSq, no sqrt
+final Fixed kTowerAttackDamage = Fixed.fromNum(20); // damage per tower shot
 const int kTowerAttackCooldownTicks = 30; // 1.0/s
 
 // --- Core ---
-final Fixed kCoreMaxHp = Fixed.fromInt(400);
+final Fixed kCoreMaxHp = Fixed.fromInt(400); // hit-points; destroying it ends the match
 
 // --- Neutral creeps (slice = passive last-hit fodder; spec §6: 5/wave) ---
-final Fixed kCreepMaxHp = Fixed.fromInt(60);
-const int kCreepsPerWave = 3;
+final Fixed kCreepMaxHp = Fixed.fromInt(60); // hit-points per neutral creep
+const int kCreepsPerWave = 3; // creeps spawned per wave (one wave per lane side)
 const int kFirstWaveTick = 450; // 0:15
 const int kWaveIntervalTicks = 900; // 30s
 
