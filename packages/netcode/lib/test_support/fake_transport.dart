@@ -28,8 +28,11 @@ class FakeTransport {
   int _accMs = 0;
   final List<_InFlight<InputMsg>> _toServer = [];
   final List<_InFlight<SnapshotMsg>> _toClient = [];
-  // Nullable: server may have received no input for a slot yet.
-  final List<Intent?> _serverHeld = [null, null];
+  // Mirror the real server IntentBuffer: per-slot HELD move/attack (persistent,
+  // last-writer-wins) + per-slot ONE-SHOT ability (drained once). Nullable: a
+  // slot may have received no input yet.
+  final List<Intent?> _held = [null, null];
+  final List<Intent?> _pendingAbility = [null, null];
   final List<int> _ackedSeq = [0, 0];
 
   /// The exact merged authoritative intents the server stepped at each tick,
@@ -85,34 +88,55 @@ class FakeTransport {
     // at least one tick ahead of the server when snapshots are delivered.
     client.advanceClientTick();
 
-    // Deliver due client->server inputs into the server's held-intent slots.
+    // Deliver due client->server inputs. Mirrors Match.addPlayer (drop input for
+    // a downed slot, NOT acked) + IntentBuffer.accept (seq-dedupe; split held
+    // move/attack vs one-shot ability).
     _toServer.removeWhere((f) {
-      if (f.deliverAtMs <= _nowMs) {
-        final m = f.payload;
-        if (m.seq > _ackedSeq[m.slot]) {
-          _serverHeld[m.slot] = Intent(
-              playerSlot: m.slot,
-              type: IntentType.values[m.type],
-              aimX: m.aimX,
-              aimY: m.aimY,
-              seq: m.seq,
-              clientTick: m.clientTick);
-          _ackedSeq[m.slot] = m.seq;
+      if (f.deliverAtMs > _nowMs) return false;
+      final m = f.payload;
+      if (m.slot < 0 || m.slot > 1) return true; // out-of-range: drop
+      if (server.entity(m.slot).isDowned) return true; // dead heroes take no orders
+      if (m.seq > _ackedSeq[m.slot]) {
+        _ackedSeq[m.slot] = m.seq;
+        final intent = Intent(
+            playerSlot: m.slot,
+            type: IntentType.values[m.type],
+            aimX: m.aimX,
+            aimY: m.aimY,
+            seq: m.seq,
+            clientTick: m.clientTick);
+        if (intent.type == IntentType.ability) {
+          _pendingAbility[m.slot] = intent; // one-shot
+        } else {
+          _held[m.slot] = intent; // move/attack: persistent
         }
-        return true;
       }
-      return false;
+      return true;
     });
 
     // Step the server forward by whole ticks accumulated.
     while (_accMs >= dtMs) {
       _accMs -= dtMs;
       final intents = <Intent>[
-        for (final h in _serverHeld)
+        for (final h in _held)
           if (h != null) h,
       ];
+      for (var slot = 0; slot < 2; slot++) {
+        final a = _pendingAbility[slot];
+        if (a != null) {
+          intents.add(a);
+          _pendingAbility[slot] = null; // one-shot: fire once, then clear
+        }
+      }
       final tick = _serverNextTick;
-      server.step(tick, intents);
+      final events = server.step(tick, intents);
+      // Mirror Match._tick: death cancels the slot's held order (+ pending ability).
+      for (final e in events) {
+        if (e is HeroDowned) {
+          _held[e.heroId] = null;
+          _pendingAbility[e.heroId] = null;
+        }
+      }
       // Record the merged authoritative input list for independent replay.
       serverInputLog.add(List.of(intents));
       if (shouldSnapshot(tick) && !_drop()) {
