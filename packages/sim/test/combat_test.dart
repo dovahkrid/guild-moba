@@ -34,6 +34,7 @@ void main() {
     final sim = Simulation.create(const SimConfig(seed: 1));
     final events = sim.step(0, const []);
     expect(events, isA<List<SimEvent>>());
+    expect(events, isEmpty); // a no-op tick (no locks, nothing in range) emits nothing
   });
 
   test('unlocked adjacent heroes do NOT attack; locking deals damage + sets the lock', () {

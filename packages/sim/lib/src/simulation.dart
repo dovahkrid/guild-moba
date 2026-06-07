@@ -73,7 +73,10 @@ class Simulation {
   List<int> get entityIdsSorted => _entities.map((e) => e.id).toList()..sort();
   Entity entity(int id) => _byId[id]!;
 
-  /// Advance one fixed tick. Returns cosmetic-only events (never mutate state).
+  /// Advance one fixed tick through five ordered phases (intents -> pursue ->
+  /// movement -> combat -> wander). Returns cosmetic-only events that never
+  /// mutate state. The phase order is load-bearing for determinism: do not
+  /// reorder, skip, or hoist phases (especially the wander RNG draw in phase 5).
   List<SimEvent> step(int currentTick, List<Intent> intents) {
     tick = currentTick;
     final events = <SimEvent>[];
@@ -121,7 +124,8 @@ class Simulation {
     // 4. Combat: cooldowns + instantaneous damage (heroes hit only their lock).
     _stepCombat(events);
 
-    // 5. The wanderer drifts LAST — keeps the RNG through the gate every tick.
+    // 5. The wanderer drifts LAST — puts the RNG through the determinism gate
+    //    every tick regardless of whether combat fired. Do NOT move or skip it.
     final w = _byId[kWandererEntityId]!;
     final dx = _rng.nextInt(3) - 1; // -1, 0, +1
     final dy = _rng.nextInt(3) - 1;
