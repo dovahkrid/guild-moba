@@ -216,4 +216,64 @@ void main() {
     noWave.restoreFromSnapshot(early.snapshotBytes());
     expect(noWave.entityIdsSorted.any((id) => id >= kCreepIdBase), isFalse);
   });
+
+  test('last-hitting a creep credits the killer hero gold and despawns it', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    for (var t = 0; t <= kFirstWaveTick; t++) {
+      sim.step(t, const []);
+    }
+    final creep = sim.entity(kCreepIdBase);
+    creep.hp = Fixed.fromInt(5); // next hero hit is lethal
+    final hero = sim.entity(0);
+    hero.pos = creep.pos; // in range
+    hero.target = hero.pos;
+    hero.attackCooldown = 0;
+    final goldBefore = hero.gold;
+    // Hero 0 right-clicks (locks) the creep; the lethal hit lands this tick.
+    final events = sim.step(kFirstWaveTick + 1,
+        const [Intent(playerSlot: 0, type: IntentType.attack, aimX: kCreepIdBase, seq: 1)]);
+    expect(hero.gold, goldBefore + kCreepGold);
+    expect(sim.entityIdsSorted.contains(kCreepIdBase), isFalse); // despawned
+    final ck = events.whereType<CreepKilled>().single;
+    expect(ck.creepId, kCreepIdBase);
+    expect(ck.killerId, 0);
+    expect(ck.gold, kCreepGold);
+  });
+
+  test('destroying an enemy outer tower credits 200 gold to the killer', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    sim.entity(kOuterTower1Id).hp = Fixed.fromInt(5);
+    final hero = sim.entity(0);
+    hero.pos = FVec2(Fixed.fromInt(3), Fixed.zero); // next to team1 outer (+4)
+    hero.target = hero.pos;
+    sim.entity(1).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(1).target = sim.entity(1).pos;
+    sim.step(0, const [Intent(playerSlot: 0, type: IntentType.attack, aimX: kOuterTower1Id, seq: 1)]);
+    expect(sim.entity(0).gold, kOuterTowerGold);
+  });
+
+  test('a hero last-hits a full 60-hp creep via real attack cadence (no shortcut)', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    for (var t = 0; t <= kFirstWaveTick; t++) {
+      sim.step(t, const []);
+    }
+    // Relocate the creep + hero 0 to a TOWER-SAFE spot on team 0's own side
+    // (x=-8 is >6 from every enemy tower at +4/+10/+14, and own towers never
+    // fire on own heroes), so ONLY the hero's auto-attack cadence kills it.
+    final creep = sim.entity(kCreepIdBase);
+    creep.pos = FVec2(Fixed.fromInt(-8), Fixed.zero);
+    final hero = sim.entity(0);
+    hero.pos = creep.pos;
+    hero.target = hero.pos;
+    hero.attackTargetId = kCreepIdBase; // lock the creep (persists across ticks)
+    sim.entity(1).pos = FVec2(Fixed.fromInt(40), Fixed.zero);
+    sim.entity(1).target = sim.entity(1).pos;
+    var t = kFirstWaveTick + 1;
+    while (sim.entityIdsSorted.contains(kCreepIdBase) && t < kFirstWaveTick + 200) {
+      sim.step(t, const []);
+      t++;
+    }
+    expect(sim.entityIdsSorted.contains(kCreepIdBase), isFalse); // died to real DPS
+    expect(sim.entity(0).gold, kCreepGold); // 60hp / 8dmg = 8 hits, credited once
+  });
 }

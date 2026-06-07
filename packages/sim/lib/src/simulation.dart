@@ -218,6 +218,7 @@ class Simulation {
     // (Task 9) are handled by their own systems.
     _sweepDeadStructures(events);
     _sweepDeadHeroes();
+    _sweepDeadCreeps(events);
   }
 
   void _sweepDeadHeroes() {
@@ -228,6 +229,26 @@ class Simulation {
       e.pos = FVec2(_heroSpawnX(e), Fixed.zero); // park at base while downed
       e.target = e.pos;
     }
+  }
+
+  void _sweepDeadCreeps(List<SimEvent> events) {
+    final dead = <Entity>[];
+    for (final e in _entities) {
+      if (e.kind == EntityKind.creep && e.hp.raw <= 0) dead.add(e);
+    }
+    for (final e in dead) {
+      final killerId = _lastDamagerOf(e.id);
+      _creditGold(killerId, kCreepGold);
+      events.add(CreepKilled(creepId: e.id, killerId: killerId, gold: kCreepGold));
+      _removeEntity(e.id);
+    }
+  }
+
+  /// Credit gold to a hero by id (no-op if the killer isn't a live hero, e.g. a
+  /// tower last-hit a creep). Gold is a plain int running total.
+  void _creditGold(int heroId, int amount) {
+    final e = _byId[heroId];
+    if (e != null && e.kind == EntityKind.hero) e.gold += amount;
   }
 
   /// A hero's spawn x by team (team 0 negative side, team 1 positive side).
@@ -259,8 +280,10 @@ class Simulation {
     }
     for (final e in dead) {
       if (e.kind == EntityKind.tower) {
-        events.add(TowerDestroyed(
-            towerId: e.id, teamId: e.teamId, killerId: _lastDamagerOf(e.id)));
+        final killerId = _lastDamagerOf(e.id);
+        final isInner = e.id == kInnerTower0Id || e.id == kInnerTower1Id;
+        _creditGold(killerId, isInner ? kInnerTowerGold : kOuterTowerGold);
+        events.add(TowerDestroyed(towerId: e.id, teamId: e.teamId, killerId: killerId));
       }
       _removeEntity(e.id);
     }
