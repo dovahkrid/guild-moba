@@ -2,13 +2,14 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:netcode/netcode.dart' show MatchView, RenderEntity;
-import 'package:sim/sim.dart' show EntityKind;
+import 'package:sim/sim.dart' show EntityKind, heroElement;
 
 import '../match/match_binding.dart';
 import 'coord.dart';
 import 'entity_view.dart';
 import 'field_view.dart';
 import 'reaction_label.dart';
+import 'sprites/sprite_catalog.dart';
 import 'world_backdrop.dart';
 
 /// The Flame game. Renders MatchView's entity list as colored shapes; holds ZERO
@@ -19,10 +20,12 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
   final MatchBinding binding;
   final Map<int, EntityView> _views = {};
   final Map<int, FieldView> _fieldViews = {}; // keyed by field ownerId
+  final SpriteCatalog _catalog = SpriteCatalog();
 
   @override
   Future<void> onLoad() async {
     camera = CameraComponent.withFixedResolution(width: 960, height: 540, world: world);
+    await _catalog.load();
     await world.add(WorldBackdrop());
   }
 
@@ -43,7 +46,13 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
       seen.add(re.id);
       var view = _views[re.id];
       if (view == null) {
-        view = EntityView(kind: re.kind, teamId: re.teamId, isLocal: re.id == v.localSlot);
+        view = EntityView(
+          kind: re.kind,
+          teamId: re.teamId,
+          element: re.kind == EntityKind.hero.index ? heroElement(re.id) : -1,
+          isLocal: re.id == v.localSlot,
+          catalog: _catalog,
+        );
         _views[re.id] = view;
         world.add(view);
         if (re.id == v.localSlot) camera.follow(view);
