@@ -18,3 +18,8 @@ double worldToFlameY(double wy) => wy * kPixelsPerUnit;
 
 /// Convert a Flame pixel coordinate back to a world unit (single axis).
 double flameToWorld(double f) => f / kPixelsPerUnit;
+
+/// Pixel radius of a tower's attack-range ring (the sim's [kTowerAttackRange]
+/// in world units, scaled to screen). Reads the constant so it tracks any
+/// future range change. At range 4 this is 4 * 28 = 112 px.
+double towerRangeRingRadiusPx() => kTowerAttackRange.toDouble() * kPixelsPerUnit;

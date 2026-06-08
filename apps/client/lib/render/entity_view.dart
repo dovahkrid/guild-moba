@@ -6,6 +6,8 @@ import 'package:flame/effects.dart';
 import 'package:flutter/animation.dart' show Curves;
 import 'package:sim/sim.dart' show EntityKind;
 
+import 'coord.dart';
+import 'dashed_circle.dart';
 import 'element_palette.dart';
 import 'sprites/pixel_sprite_component.dart';
 import 'sprites/sprite_catalog.dart';
@@ -18,6 +20,14 @@ int facingFor(double dx, int prev, {double deadzone = 0.02}) {
   if (dx < -deadzone) return -1;
   return prev == 0 ? 1 : prev;
 }
+
+/// Debug/tuning aid (spec 2026-06-09 §2): draw each tower's attack range as a
+/// dashed ring. Flip to false to remove all range rings.
+const bool kShowTowerRangeRings = true;
+
+/// Subtle, low-alpha team tint for a tower's range ring.
+Color _rangeRingColor(int teamId) =>
+    teamId == 0 ? const Color(0x5564B5F6) : const Color(0x55E57373);
 
 /// A Flame view of one sim entity: a recolored pixel sprite + health bar + a
 /// tweened elemental-status aura. Animates facing, an idle/walk bob, spawn-in,
@@ -65,6 +75,13 @@ class EntityView extends PositionComponent {
 
   @override
   Future<void> onLoad() async {
+    if (kShowTowerRangeRings && kind == EntityKind.tower.index) {
+      await add(DashedCircle(
+        radius: towerRangeRingRadiusPx(),
+        color: _rangeRingColor(teamId),
+      ));
+    }
+
     _sprite = PixelSpriteComponent(
       sprite: catalog.forKind(kind),
       slotColors: spritePalette(teamId, element),
