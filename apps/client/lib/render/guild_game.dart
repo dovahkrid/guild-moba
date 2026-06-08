@@ -1,3 +1,5 @@
+import 'dart:ui'; // Color for the FX tints (flame/components does not re-export it)
+
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
@@ -9,6 +11,9 @@ import '../match/match_binding.dart';
 import 'coord.dart';
 import 'entity_view.dart';
 import 'field_view.dart';
+import 'fx/attack_streak.dart';
+import 'fx/burst.dart';
+import 'fx/damage_number.dart';
 import 'reaction_label.dart';
 import 'sprites/sprite_catalog.dart';
 import 'world_backdrop.dart';
@@ -98,12 +103,11 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
     for (final fx in binding.drainFx()) {
       _handleFx(fx);
     }
-    // Reaction pop-text (flat vs amplify).
+    // Reaction pop-text (flat vs amplify) + burst.
     for (final r in binding.drainReactions()) {
-      world.add(ReactionLabel(
-        text: reactionText(r.reaction, r.multiplierRaw),
-        position: Vector2(worldToFlameX(r.x), worldToFlameY(r.y)),
-      ));
+      final pos = Vector2(worldToFlameX(r.x), worldToFlameY(r.y));
+      world.add(ReactionLabel(text: reactionText(r.reaction, r.multiplierRaw), position: pos.clone()));
+      world.add(spawnBurst(pos, const Color(0xFFFFD54F), count: 12, speed: 70));
     }
   }
 
@@ -112,11 +116,26 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
       case HeroDownFx(:final heroId):
         _downed.add(heroId);
         _views[heroId]?.setDowned(true);
-      case HitFx():
-      case KillFx():
+      case HitFx(:final victimId, :final sourceId, :final sourceKind, :final amountRaw, :final x, :final y):
+        final pos = Vector2(worldToFlameX(x), worldToFlameY(y));
+        _views[victimId]?.flash();
+        world.add(DamageNumber(amountRaw: amountRaw, sourceKind: sourceKind, position: pos.clone()..y -= 14));
+        final src = _views[sourceId];
+        if (src != null &&
+            (sourceKind == EntityKind.hero.index || sourceKind == EntityKind.tower.index)) {
+          world.add(AttackStreak(from: src.position.clone(), to: pos, color: const Color(0xCCFFF0B0)));
+        }
+        world.add(spawnBurst(pos, const Color(0xFFFFE082), count: 6, speed: 40));
+      case KillFx(:final x, :final y):
+        world.add(spawnBurst(
+          Vector2(worldToFlameX(x), worldToFlameY(y)),
+          const Color(0xFFB0BEC5),
+          count: 12,
+          speed: 80,
+        ));
       case TowerFallFx():
       case CoreFx():
-        break; // wired in Tasks 5–6
+        break; // wired in Task 6
     }
   }
 
