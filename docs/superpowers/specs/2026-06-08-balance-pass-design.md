@@ -11,7 +11,7 @@
 
 Unlike the animation/art phase, this phase **intentionally changes simulation behavior**, so it makes **sanctioned golden re-pins**. The rules:
 
-- **Two goldens re-pin:** `combat.golden` (currently `910ddcfc`) and `elemental.golden` (currently `8d7fbe1b`). **`smoke.golden` (`7e4aa28f`) and the in-test anchor `0x0fbfb7ac` MUST NOT move** — both are *move-only* fixtures (no combat, no creeps in-window, no elemental), so no tunable in this phase touches them. If either moves, a change leaked beyond its intended fixture and must be investigated.
+- **Two goldens re-pin:** `combat.golden` (currently `910ddcfc`) and `elemental.golden` (currently `8d7fbe1b`). **`smoke.golden` (`7e4aa28f`) and the in-test anchor `0x0fbfb7ac` MUST NOT move** — both are *move-only* fixtures (no combat, no creeps in-window, no elemental), and **Group 1 is deliberately RANGE-ONLY** (it never moves a tower *position*, which is serialized into every fixture's hash + the anchor — see §1), so no tunable in this phase touches them. If either moves, a change leaked beyond its intended fixture and must be investigated.
 - **No byte-layout change, no version bump.** Every change is a constant *value*; the wire format, entity field set, and `_entityBodyCodecs` order are untouched. `kSchemaVersion`/`kSnapshotVersion` stay **3/3**.
 - **Re-pin procedure (never hand-typed):** for each moved golden, prove byte-identical native / dart2js / dart2wasm via `bash tooling/compare_replays.sh tooling/replay_fixtures/<fixture>.json`, then regenerate the `.golden` from harness output. Change one *attribution group* at a time and verify exactly the expected golden(s) moved (and the others did not) **before** re-pinning — clean attribution, per the Plan-6 re-pin discipline.
 
@@ -23,17 +23,18 @@ Determinism rules unchanged (enforced on every change): **`Fixed` (Q16.16) + `in
 
 Each row is `const`: current value → new value, with the rationale and the golden it moves. Tick rate is 30/s.
 
-### Group 1 — Lane geometry: make the center safe to farm (`combat.dart`)
+### Group 1 — Lane geometry: make the center safe to farm (`combat.dart`, RANGE-ONLY)
 
-The enemy outer tower (`kOuterTowerX = ±4`, `kTowerAttackRange = 6`) reaches lane center (x=0) where creeps spawn, so a hero advancing to last-hit sits in enemy tower fire. Push the throat up the lane and shorten tower reach so center clears the enemy outer tower by ~1 unit.
+The enemy outer tower (`kOuterTowerX = ±4`, `kTowerAttackRange = 6`) reaches a hero standing at the center clash to last-hit — the furthest center creep sits ≈±1.5, and reaching it (hero range 3) puts the hero at x≈∓1.5, only 5.5 units from the enemy outer tower, *inside* range 6. **Shorten the tower's reach (range 6 → 5); do NOT move the towers.**
+
+This range-only choice is deliberate and load-bearing for the re-pin scope: `kOuterTowerX` is a **serialized entity position** (every tower's `pos` is written into `canonicalBytes`, so moving it changes EVERY fixture's per-tick hash *and* the move-only `0x0fbfb7ac` anchor), whereas `kTowerAttackRange`/`…RangeSq` is **behavior-only** (a `lengthSq` compare in targeting, never stored). Range-only therefore leaves all tower positions — and so `smoke.golden`, the anchor, and `elemental.golden` — byte-untouched, moving only `combat.golden`.
 
 | Const | Now | New | Note |
 |---|---|---|---|
-| `kOuterTowerX` | `Fixed.fromInt(4)` | `Fixed.fromInt(6)` | team0 −6 / team1 +6 |
-| `kTowerAttackRange` | `Fixed.fromNum(6)` | `Fixed.fromNum(5)` | display/reference |
-| `kTowerAttackRangeSq` | `Fixed.fromNum(6 * 6)` | `Fixed.fromNum(5 * 5)` | **the actual gate** (lengthSq compare) — MUST change in lockstep with the line above |
+| `kTowerAttackRange` | `Fixed.fromNum(6)` | `Fixed.fromNum(5)` | display/reference value |
+| `kTowerAttackRangeSq` | `Fixed.fromNum(6 * 6)` (=36) | `Fixed.fromNum(5 * 5)` (=25) | **the actual targeting gate** (`lengthSq` compare) — MUST change in lockstep with the row above; `combat_test.dart` asserts `RangeSq == Range²` |
 
-Result: enemy outer tower reaches only to x=±1; the center clash (x=0) and a hero standing anywhere on its own side to last-hit it (hero range 3 lets it hit x=0 from x=−1.5, distance 7.5 > 5 to the +6 tower) take no tower fire. Inner (`±10`) + core (`±14`) + hero spawn (`±8`) unchanged and still well-defended (inner range 5 covers the base mouth; diving the enemy throat at ±6 still draws outer+inner fire). **Moves `combat.golden`** (heroes fight at center in `combat.json`, where they currently *are* in old enemy-tower range).
+`kOuterTowerX` (±4), `kInnerTowerX` (±10), `kCoreX` (±14), hero spawn (±8) **all unchanged**. Result: the enemy outer tower now reaches only to x=∓1 (team1's +4 tower covers down to −1), so a hero last-hitting the furthest center creep from x≈∓1.5 (distance 5.5 > 5) is safe; only standing at/past dead-center draws fire. **Moves `combat.golden`** (groups 2–3 move it regardless; the range change additionally shifts tower-fire timing on the heroes brawling at center in `combat.json`).
 
 ### Group 2 — Creep last-hit: snappier (`combat.dart`)
 
@@ -72,7 +73,7 @@ Cast-burst 10 (≈13 Vaporize-amplified) and flat-reaction 8 are barely an auto-
 |---|---|---|
 | `smoke.golden` `7e4aa28f` | **NO** | move-only fixture; no tunable here applies — assert unchanged |
 | in-test anchor `0x0fbfb7ac` | **NO** | move-only — assert unchanged |
-| `combat.golden` `910ddcfc` | **YES** | Groups 1–3 (tower geometry/range, creep hp, hero damage) |
+| `combat.golden` `910ddcfc` | **YES** | Groups 1–3 (tower range, creep hp, hero damage) |
 | `elemental.golden` `8d7fbe1b` | **YES** | Group 4 (cast-burst, flat-reaction) |
 
 - **Attribution:** apply the combat groups (1–3) → run all three fixtures + the anchor → confirm **only `combat.golden`** changed (smoke + elemental + anchor byte-identical) → re-pin `combat.golden` cross-runtime. Then apply Group 4 → confirm **only `elemental.golden`** changed → re-pin `elemental.golden` cross-runtime.
@@ -83,7 +84,9 @@ Cast-burst 10 (≈13 Vaporize-amplified) and flat-reaction 8 are barely an auto-
 
 ## 3. Scope
 
-**IN:** retune the placeholder constants in `data/combat.dart` (`kOuterTowerX` 4→6, `kTowerAttackRange`/`Sq` 6→5/36→25, `kCreepMaxHp` 60→40, `kHeroAttackDamage` 8→10) and `data/elements.dart` (`kCastBurstDamage` 10→16, `kReactionFlatDamage` 8→12); refresh the inline comments (these are now playtest-tuned, not raw placeholders; keep the `// spec §…` target breadcrumbs); re-pin `combat.golden` + `elemental.golden` cross-runtime with clean attribution; full determinism + cross-runtime sweep.
+**IN:** retune the placeholder constants in `data/combat.dart` (`kTowerAttackRange`/`Sq` 6→5/36→25 **range-only — towers NOT moved**, `kCreepMaxHp` 60→40, `kHeroAttackDamage` 8→10) and `data/elements.dart` (`kCastBurstDamage` 10→16, `kReactionFlatDamage` 8→12); refresh the inline comments + the stale sim-test comments/names that quote old numbers (`combat_test`'s "60-hp creep"/"8 hits"/"range 6"; `reaction_test`'s "< kCastBurstDamage (10)") — assertions are symbolic and stay green; re-pin `combat.golden` + `elemental.golden` cross-runtime with clean attribution; full determinism + cross-runtime sweep.
+
+**Note (spec refinement, 2026-06-08):** the originally-approved Group 1 also moved `kOuterTowerX` ±4→±6; that was dropped during planning because moving a tower position would change `smoke.golden` + the `0x0fbfb7ac` anchor (tower `pos` is serialized), contradicting this spec's own re-pin scope. Range-only achieves the same "safe center farm" goal while keeping the scope as stated.
 
 **OUT:** any mechanic / code-path / phase-order change; any new constant, entity field, enum, or `SimEvent`; any byte-layout or version bump; any change to hero hp/cooldown/range, respawn timing, wave cadence, gold values, field radius/duration, ability cooldown, status/ICD timing, or `kVaporizeMult` (kept this pass — revisit only if a follow-up playtest shows the new burst is too swingy); `smoke.golden` / the anchor (must stay); any client/render change (`apps/client` untouched); the keyboard skill-bind + aiming-mode controls (the separate next cycle); the respawn-render-delay item.
 
@@ -101,7 +104,7 @@ Cast-burst 10 (≈13 Vaporize-amplified) and flat-reaction 8 are barely an auto-
 
 ## 5. Task plan (2 tasks, attribution-clean)
 
-1. **Combat retune (Groups 1–3) + re-pin `combat.golden`.** Edit `combat.dart` (`kOuterTowerX`, `kTowerAttackRange`, `kTowerAttackRangeSq`, `kCreepMaxHp`, `kHeroAttackDamage`) + comments; update any sim test that asserts an old combat number; verify smoke + elemental + anchor unchanged, combat moves cross-runtime-cleanly; re-pin `combat.golden`.
+1. **Combat retune (Groups 1–3) + re-pin `combat.golden`.** Edit `combat.dart` (`kTowerAttackRange` + `kTowerAttackRangeSq` in lockstep, `kCreepMaxHp`, `kHeroAttackDamage`; **`kOuterTowerX` untouched**) + comments; refresh the stale `combat_test.dart` names/comments; verify smoke + elemental + anchor byte-unchanged and combat moves cross-runtime-cleanly; re-pin `combat.golden`.
 2. **Elemental retune (Group 4) + re-pin `elemental.golden`.** Edit `elements.dart` (`kCastBurstDamage`, `kReactionFlatDamage`) + comments; update any sim test that asserts an old elemental-damage number; verify smoke + combat + anchor unchanged, elemental moves cross-runtime-cleanly; re-pin `elemental.golden`.
 
 Order rationale: combat and elemental move disjoint goldens, so either order works; doing combat first keeps the two re-pins independent and each task's attribution check is "exactly one golden moved." Final full sweep after both.
