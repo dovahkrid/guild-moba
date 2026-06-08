@@ -2,13 +2,16 @@ import 'dart:math' as math;
 import 'dart:ui'; // Color for the FX tints (flame/components does not re-export it)
 
 import 'package:flame/components.dart';
-import 'package:flame/events.dart';
+import 'package:flame/events.dart'; // KeyboardEvents mixin (also re-exported here)
 import 'package:flame/game.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey, KeyEvent, KeyDownEvent;
+import 'package:flutter/widgets.dart' show KeyEventResult;
 import 'package:netcode/netcode.dart'
     show MatchView, RenderEntity, RenderFx, HitFx, KillFx, TowerFallFx, CoreFx, HeroDownFx;
-import 'package:sim/sim.dart' show EntityKind, heroElement;
+import 'package:sim/sim.dart' show EntityKind, heroElement, heroPlacesAtSelf;
 
 import '../match/match_binding.dart';
+import '../match/skill_input.dart';
 import 'coord.dart';
 import 'entity_view.dart';
 import 'field_view.dart';
@@ -21,7 +24,7 @@ import 'world_backdrop.dart';
 
 /// The Flame game. Renders MatchView's entity list as colored shapes; holds ZERO
 /// gameplay truth. Spawns/despawns EntityViews via an id-keyed diff each frame.
-class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
+class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks, KeyboardEvents {
   GuildGame(this.binding);
 
   final MatchBinding binding;
@@ -29,6 +32,7 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
   final Map<int, FieldView> _fieldViews = {}; // keyed by field ownerId
   final SpriteCatalog _catalog = SpriteCatalog();
   final Set<int> _downed = {};
+  final SkillInputController _skill = SkillInputController();
   double _shake = 0; // 0..1
   double _shakeT = 0;
 
@@ -85,6 +89,8 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
         _views[re.id]?.respawn();
       }
     }
+    // The local hero went down mid-aim: drop any pending aim (can't cast downed).
+    if (_downed.contains(v.localSlot) && _skill.aimPending) _skill.clearAim();
 
     // Diff field zones (keyed by ownerId).
     final seenFields = <int>{};
@@ -161,11 +167,34 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
     if (amount > _shake) _shake = amount.clamp(0.0, 1.0);
   }
 
+  /// E = cast the hero's skill. Self-placed skills (Cinderfang) fire at once;
+  /// aim-placed skills (Marisol) arm aim mode, then a left-click places them.
+  @override
+  KeyEventResult onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
+    if (event is! KeyDownEvent || event.logicalKey != LogicalKeyboardKey.keyE) {
+      return KeyEventResult.ignored;
+    }
+    final v = binding.view;
+    if (v != null) {
+      final downed = _downed.contains(v.localSlot);
+      final action = _skill.onSkillKey(downed: downed, placesAtSelf: heroPlacesAtSelf(v.localSlot));
+      if (action == SkillAction.castAtSelf) {
+        // Self-placed: the sim ignores the aim point (uses the hero's own
+        // position), but we pass it for clarity.
+        binding.submitAbility(worldToRaw(v.local.x), worldToRaw(v.local.y));
+      }
+      // enterAim / cancel / none: state already updated in the controller; no
+      // reticle this pass (spec §3.3 fallback).
+    }
+    return KeyEventResult.handled;
+  }
+
   /// LoL right-click semantics: right-clicking ON an enemy locks an attack onto
-  /// it; right-clicking the ground issues a move (which clears any lock).
-  /// Left-click is the ability aim (see [onTapUp]).
+  /// it; right-clicking the ground issues a move (which clears any lock). While
+  /// a skill aim is pending (armed by E), a right-click instead cancels it.
   @override
   void onSecondaryTapUp(SecondaryTapUpEvent event) {
+    if (_skill.onRightClickConsumedAsCancel()) return; // cancel the pending aim; no move
     final worldPos = camera.globalToLocal(event.canvasPosition);
     final wx = flameToWorld(worldPos.x);
     final wy = flameToWorld(worldPos.y);
@@ -180,9 +209,11 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
     binding.submitMoveTo(worldToRaw(wx), worldToRaw(wy));
   }
 
-  /// Left-click = ability aim: cast the hero's field at the clicked world point.
+  /// Left-click = aim-confirm. Only casts when a skill is pending (armed by E);
+  /// otherwise does nothing.
   @override
   void onTapUp(TapUpEvent event) {
+    if (_skill.onLeftClick() != SkillAction.castAtPoint) return;
     final worldPos = camera.globalToLocal(event.canvasPosition);
     binding.submitAbility(
         worldToRaw(flameToWorld(worldPos.x)), worldToRaw(flameToWorld(worldPos.y)));
