@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui'; // Color for the FX tints (flame/components does not re-export it)
 
 import 'package:flame/components.dart';
@@ -28,6 +29,8 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
   final Map<int, FieldView> _fieldViews = {}; // keyed by field ownerId
   final SpriteCatalog _catalog = SpriteCatalog();
   final Set<int> _downed = {};
+  double _shake = 0; // 0..1
+  double _shakeT = 0;
 
   @override
   Future<void> onLoad() async {
@@ -109,6 +112,15 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
       world.add(ReactionLabel(text: reactionText(r.reaction, r.multiplierRaw), position: pos.clone()));
       world.add(spawnBurst(pos, const Color(0xFFFFD54F), count: 12, speed: 70));
     }
+    if (_shake > 0) {
+      _shake = (_shake - dt * 4).clamp(0.0, 1.0);
+      _shakeT += dt;
+      final mag = _shake * 9.0;
+      camera.viewfinder.position += Vector2(
+        math.sin(_shakeT * 97) * mag,
+        math.cos(_shakeT * 131) * mag,
+      );
+    }
   }
 
   void _handleFx(RenderFx fx) {
@@ -133,10 +145,20 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
           count: 12,
           speed: 80,
         ));
-      case TowerFallFx():
-      case CoreFx():
-        break; // wired in Task 6
+      case TowerFallFx(:final x, :final y):
+        final pos = Vector2(worldToFlameX(x), worldToFlameY(y));
+        world.add(spawnBurst(pos, const Color(0xFFB0BEC5), count: 18, speed: 90));
+        _addShake(0.6);
+      case CoreFx(:final x, :final y):
+        final pos = Vector2(worldToFlameX(x), worldToFlameY(y));
+        world.add(spawnBurst(pos, const Color(0xFFFFF59D), count: 40, speed: 140));
+        world.add(spawnBurst(pos, const Color(0xFF80DEEA), count: 30, speed: 100));
+        _addShake(1.0);
     }
+  }
+
+  void _addShake(double amount) {
+    if (amount > _shake) _shake = amount.clamp(0.0, 1.0);
   }
 
   /// LoL right-click semantics: right-clicking ON an enemy locks an attack onto
