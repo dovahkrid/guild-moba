@@ -1,7 +1,7 @@
 import '../math/fixed.dart';
 
-/// Combat tunables for the Milestone-0 slice. PLAYTEST PLACEHOLDERS (spec §13
-/// defers exact numbers); slice values keep a match tractable and obey the
+/// Combat tunables for the Milestone-0 slice — PLAYTEST-TUNED 2026-06-08 (spec
+/// §13; revisit in a future pass). Values keep a match tractable and obey the
 /// Fixed contract (|value| < 32768). Spec's eventual targets noted inline.
 
 const int kTicksPerSecond = 30; // server tick rate; seconds × 30 = ticks.
@@ -10,15 +10,15 @@ const int kTicksPerSecond = 30; // server tick rate; seconds × 30 = ticks.
 final Fixed kHeroMaxHp = Fixed.fromInt(100);
 final Fixed kHeroAttackRange = Fixed.fromNum(3); // world-units
 final Fixed kHeroAttackRangeSq = Fixed.fromNum(3 * 3); // compare vs lengthSq, no sqrt
-final Fixed kHeroAttackDamage = Fixed.fromNum(8); // damage per auto-attack hit
+final Fixed kHeroAttackDamage = Fixed.fromNum(10); // damage per auto-attack hit (playtest-tuned 2026-06-08, was 8)
 const int kHeroAttackCooldownTicks = 18; // ~0.6s
 const int kHeroRespawnTicks = 150; // 5s
 
 // --- Towers (spec §6 targets: outer 1800/120/1.0/~6, inner 2400/150/1.1/~6) ---
 final Fixed kOuterTowerMaxHp = Fixed.fromInt(600); // hit-points (outer/front tower)
 final Fixed kInnerTowerMaxHp = Fixed.fromInt(800); // hit-points (inner/base tower)
-final Fixed kTowerAttackRange = Fixed.fromNum(6); // world-units
-final Fixed kTowerAttackRangeSq = Fixed.fromNum(6 * 6); // compare vs lengthSq, no sqrt
+final Fixed kTowerAttackRange = Fixed.fromNum(5); // world-units (playtest-tuned 2026-06-08, was 6 — range-only lane fix: towers NOT moved)
+final Fixed kTowerAttackRangeSq = Fixed.fromNum(5 * 5); // compare vs lengthSq, no sqrt
 final Fixed kTowerAttackDamage = Fixed.fromNum(20); // damage per tower shot
 const int kTowerAttackCooldownTicks = 30; // 1.0/s
 
@@ -26,7 +26,7 @@ const int kTowerAttackCooldownTicks = 30; // 1.0/s
 final Fixed kCoreMaxHp = Fixed.fromInt(400); // hit-points; destroying it ends the match
 
 // --- Neutral creeps (slice = passive last-hit fodder; spec §6: 5/wave) ---
-final Fixed kCreepMaxHp = Fixed.fromInt(60); // hit-points per neutral creep
+final Fixed kCreepMaxHp = Fixed.fromInt(40); // hit-points per neutral creep (playtest-tuned 2026-06-08, was 60 → ~4 autos)
 const int kCreepsPerWave = 3; // creeps spawned per wave
 const int kFirstWaveTick = 450; // 0:15
 const int kWaveIntervalTicks = 900; // 30s
