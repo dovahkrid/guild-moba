@@ -1,7 +1,8 @@
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
-import 'package:netcode/netcode.dart' show MatchView, RenderEntity;
+import 'package:netcode/netcode.dart'
+    show MatchView, RenderEntity, RenderFx, HitFx, KillFx, TowerFallFx, CoreFx, HeroDownFx;
 import 'package:sim/sim.dart' show EntityKind, heroElement;
 
 import '../match/match_binding.dart';
@@ -21,6 +22,7 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
   final Map<int, EntityView> _views = {};
   final Map<int, FieldView> _fieldViews = {}; // keyed by field ownerId
   final SpriteCatalog _catalog = SpriteCatalog();
+  final Set<int> _downed = {};
 
   @override
   Future<void> onLoad() async {
@@ -61,10 +63,19 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
       view.hpRatio = re.maxHp > 0 ? re.hp / re.maxHp : 1.0;
       view.statusElement = re.statusElement; // discrete; never interpolated
     }
-    // Despawn views whose entity is gone (dead creep / fallen tower / dead core).
+    // Despawn (animate) views whose entity is gone (dead creep / fallen tower / dead core).
     final gone = _views.keys.where((id) => !seen.contains(id)).toList();
     for (final id in gone) {
-      _views.remove(id)?.removeFromParent();
+      _views.remove(id)?.playDeathAndRemove();
+      _downed.remove(id);
+    }
+
+    // Respawn: a hero that was downed and now has hp pops back in.
+    for (final re in v.entities) {
+      if (_downed.contains(re.id) && re.hp > 0) {
+        _downed.remove(re.id);
+        _views[re.id]?.respawn();
+      }
     }
 
     // Diff field zones (keyed by ownerId).
@@ -83,12 +94,29 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks {
     for (final id in _fieldViews.keys.where((id) => !seenFields.contains(id)).toList()) {
       _fieldViews.remove(id)?.removeFromParent();
     }
-    // Spawn a pop-text per reaction that fired this frame (flat vs amplify).
+    // Combat FX surfaced this frame.
+    for (final fx in binding.drainFx()) {
+      _handleFx(fx);
+    }
+    // Reaction pop-text (flat vs amplify).
     for (final r in binding.drainReactions()) {
       world.add(ReactionLabel(
         text: reactionText(r.reaction, r.multiplierRaw),
         position: Vector2(worldToFlameX(r.x), worldToFlameY(r.y)),
       ));
+    }
+  }
+
+  void _handleFx(RenderFx fx) {
+    switch (fx) {
+      case HeroDownFx(:final heroId):
+        _downed.add(heroId);
+        _views[heroId]?.setDowned(true);
+      case HitFx():
+      case KillFx():
+      case TowerFallFx():
+      case CoreFx():
+        break; // wired in Tasks 5–6
     }
   }
 
