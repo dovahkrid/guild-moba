@@ -50,4 +50,12 @@ void main() {
     expect(s.aimPending, isFalse);
     expect(s.clearAim(), isFalse); // already clear
   });
+
+  test('left-click after a cancel returns none (state fully reset to idle)', () {
+    final s = SkillInputController();
+    s.onSkillKey(downed: false, placesAtSelf: false); // enterAim
+    expect(s.onRightClickConsumedAsCancel(), isTrue); // cancel the pending aim
+    expect(s.onLeftClick(), SkillAction.none); // idle again -> no stray cast
+    expect(s.aimPending, isFalse);
+  });
 }

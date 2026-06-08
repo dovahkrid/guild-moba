@@ -66,7 +66,8 @@ class MatchBinding {
     _transport.send(ProtocolCodec.encode(input));
   }
 
-  /// Local input: left-click a world point (Q16.16 raw) -> ability cast. Predict + send.
+  /// Local input: ability cast at a world point (Q16.16 raw), from an E-cast
+  /// (self-placed at the hero) or a left-click aim-confirm. Predict + send.
   void submitAbility(int aimXRaw, int aimYRaw) {
     if (_ended) return; // no input after the match ends
     final c = _controller;
