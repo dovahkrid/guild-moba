@@ -418,7 +418,7 @@ void main() {
     h0.target = h0.pos;
     final h1 = sim.entity(1)..pos = FVec2(Fixed.fromNum(1), Fixed.fromInt(7)); // in h0's burst radius
     h1.target = h1.pos;
-    h1.hp = Fixed.fromNum(5); // < kCastBurstDamage (10) → downed by h0's burst this tick
+    h1.hp = Fixed.fromNum(5); // < kCastBurstDamage (16) → downed by h0's burst this tick
     sim.step(0, const [
       Intent(playerSlot: 0, type: IntentType.ability, aimX: 0, aimY: 458752, seq: 1),
       Intent(playerSlot: 1, type: IntentType.ability, aimX: 0, aimY: 458752, seq: 2),

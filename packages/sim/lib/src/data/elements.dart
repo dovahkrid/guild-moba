@@ -1,8 +1,9 @@
 import '../math/fixed.dart';
 import '../model/element.dart';
 
-/// Elemental tunables for the Vaporize slice. PLAYTEST PLACEHOLDERS (spec §13
-/// defers exact numbers); all obey the Fixed budget (|value| < 32768).
+/// Elemental tunables for the Vaporize slice. Playtest-tuned 2026-06-08 (spec §13
+/// defers exact numbers; revisit in a future pass); all obey the Fixed budget
+/// (|value| < 32768).
 
 // --- Status (Genshin LIGHT timing, spec §3.1) ---
 const int kStatusDurationTicks = 45; // ~1.5s LIGHT status
@@ -21,10 +22,10 @@ const int kAbilityCooldownTicks = 240; // ~8s (> field duration → ≤1 active 
 // A one-time, enemy-only AoE dealt on cast, centered on the field. May be
 // amplified by an attack-amplify reaction → kCastBurstDamage × kVaporizeMult must
 // stay in the Fixed budget.
-final Fixed kCastBurstDamage = Fixed.fromNum(10);
+final Fixed kCastBurstDamage = Fixed.fromNum(16); // one-time enemy-only AoE on cast (playtest-tuned 2026-06-08, was 10; ×kVaporizeMult=20.8 stays in budget)
 // Flat damage from a field-overlap reaction (no triggering hit to amplify);
 // dealt only to an ENEMY of the field owner (owner/own-team take 0).
-final Fixed kReactionFlatDamage = Fixed.fromNum(8);
+final Fixed kReactionFlatDamage = Fixed.fromNum(12); // flat field-overlap reaction (playtest-tuned 2026-06-08, was 8)
 
 // --- Slice roster (data) ---
 // hero 0 = Cinderfang (Pyro, Ember Field placed at his own position);
