@@ -24,6 +24,7 @@ class MatchController {
   int _lastReconciledServerTick = -1;
   double _lastCorrectionDist = 0.0;
   final List<RenderReaction> _recentReactions = []; // collected each advanceClientTick
+  final List<RenderFx> _recentFx = []; // collected each advanceClientTick (forward only)
 
   MatchController({required int seed, required this.localSlot, required int startTick})
       : _predicted = Simulation.create(SimConfig(seed: seed)),
@@ -140,13 +141,15 @@ class MatchController {
 
   /// Advance the predicted sim one tick (host calls at 30Hz). Collects reactions
   /// fired this tick (forward prediction only — reconcile re-steps do NOT collect,
-  /// so a predicted reaction surfaces exactly once).
+  /// so a predicted reaction surfaces exactly once). Also collects combat FX.
   void advanceClientTick() {
+    final before = _snapshot();
     final events = _predicted.step(_nextTick, _intentsAt(_nextTick));
-    final presentIds = _predicted.entityIdsSorted.toSet(); // snapshot once (entityIdsSorted re-sorts per call)
+    final after = _snapshot();
+    final presentIds = after.keys.toSet();
     for (final e in events) {
       if (e is! ReactionTriggered) continue;
-      if (!presentIds.contains(e.unitId)) continue; // reacting unit gone (shouldn't happen) — skip cosmetic pop-text
+      if (!presentIds.contains(e.unitId)) continue; // reacting unit gone — skip pop-text
       final pos = _predicted.entity(e.unitId).pos;
       _recentReactions.add(RenderReaction(
         x: pos.x.toDouble(),
@@ -155,8 +158,23 @@ class MatchController {
         multiplierRaw: e.multiplierRaw,
       ));
     }
+    _recentFx.addAll(projectFx(events, before, after));
     _nextTick++;
     _dropHeldWhileLocalDowned();
+  }
+
+  Map<int, EntitySnap> _snapshot() {
+    final m = <int, EntitySnap>{};
+    for (final id in _predicted.entityIdsSorted) {
+      final e = _predicted.entity(id);
+      m[id] = EntitySnap(
+        x: e.pos.x.toDouble(),
+        y: e.pos.y.toDouble(),
+        kind: e.kind.index,
+        teamId: e.teamId,
+      );
+    }
+    return m;
   }
 
   /// Drain reactions collected since the last call (host spawns pop-text once per
@@ -166,6 +184,15 @@ class MatchController {
     if (_recentReactions.isEmpty) return const [];
     final out = List<RenderReaction>.of(_recentReactions);
     _recentReactions.clear();
+    return out;
+  }
+
+  /// Drain combat FX collected since the last call (host spawns them once/frame).
+  /// Like drainReactions(): forward-prediction-only, so each surfaces once.
+  List<RenderFx> drainFx() {
+    if (_recentFx.isEmpty) return const [];
+    final out = List<RenderFx>.of(_recentFx);
+    _recentFx.clear();
     return out;
   }
 

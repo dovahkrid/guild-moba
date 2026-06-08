@@ -79,6 +79,9 @@ class MatchBinding {
   /// Reactions that fired since the last frame (host spawns pop-text once/frame).
   List<RenderReaction> drainReactions() => _controller?.drainReactions() ?? const [];
 
+  /// Combat FX surfaced since the last frame (host spawns them once/frame).
+  List<RenderFx> drainFx() => _controller?.drainFx() ?? const [];
+
   /// Advance by [dtMs] of real time: accumulate and step the predicted sim at
   /// a fixed 30 Hz; advance the render clock for interpolation.
   ///
