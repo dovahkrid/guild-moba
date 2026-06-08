@@ -40,7 +40,7 @@ void main() {
   test('unlocked adjacent heroes do NOT attack; locking deals damage + sets the lock', () {
     final sim = Simulation.create(const SimConfig(seed: 1));
     // Place the pair off-lane at y=7 so neither hero sits in any tower's range
-    // (towers at x=±4/±10, range 5) — keeps this hero-vs-hero test combat-free.
+    // (towers at x=±4/±10, range 4) — keeps this hero-vs-hero test combat-free.
     sim.entity(0).pos = FVec2(Fixed.zero, Fixed.fromInt(7));
     sim.entity(1).pos = FVec2(Fixed.fromInt(1), Fixed.fromInt(7));
     sim.entity(0).target = sim.entity(0).pos;
@@ -182,7 +182,7 @@ void main() {
     h0.pos = const FVec2(Fixed.zero, Fixed.zero);
     final h1 = sim.entity(1);
     // Place h1 off-lane at y=7 so it sits outside every tower's 2D range
-    // (towers at x=±4/±10, range 5) — isolates the downed-hero behavior.
+    // (towers at x=±4/±10, range 4) — isolates the downed-hero behavior.
     h1.pos = FVec2(Fixed.fromInt(1), Fixed.fromInt(7));
     h1.target = h1.pos;
     sim.step(0, const []);
@@ -259,7 +259,7 @@ void main() {
       sim.step(t, const []);
     }
     // Relocate the creep + hero 0 to a TOWER-SAFE spot on team 0's own side
-    // (x=-8 is >5 from every enemy tower at +4/+10/+14, and own towers never
+    // (x=-8 is >4 from every enemy tower at +4/+10/+14, and own towers never
     // fire on own heroes), so ONLY the hero's auto-attack cadence kills it.
     final creep = sim.entity(kCreepIdBase);
     creep.pos = FVec2(Fixed.fromInt(-8), Fixed.zero);

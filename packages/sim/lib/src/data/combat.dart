@@ -17,8 +17,8 @@ const int kHeroRespawnTicks = 150; // 5s
 // --- Towers (spec §6 targets: outer 1800/120/1.0/~6, inner 2400/150/1.1/~6) ---
 final Fixed kOuterTowerMaxHp = Fixed.fromInt(600); // hit-points (outer/front tower)
 final Fixed kInnerTowerMaxHp = Fixed.fromInt(800); // hit-points (inner/base tower)
-final Fixed kTowerAttackRange = Fixed.fromNum(5); // world-units (playtest-tuned 2026-06-08, was 6 — range-only lane fix: towers NOT moved)
-final Fixed kTowerAttackRangeSq = Fixed.fromNum(5 * 5); // compare vs lengthSq, no sqrt
+final Fixed kTowerAttackRange = Fixed.fromNum(4); // world-units (playtest-tuned 2026-06-09, was 5 — reaches exactly to the midline; towers NOT moved)
+final Fixed kTowerAttackRangeSq = Fixed.fromNum(4 * 4); // compare vs lengthSq, no sqrt
 final Fixed kTowerAttackDamage = Fixed.fromNum(20); // damage per tower shot
 const int kTowerAttackCooldownTicks = 30; // 1.0/s
 
