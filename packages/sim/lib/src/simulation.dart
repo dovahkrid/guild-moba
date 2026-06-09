@@ -137,7 +137,8 @@ class Simulation {
     }
 
     // 2. Resolve pursue: a hero locked onto a valid enemy seeks its position;
-    //    an invalid lock is dropped and the hero holds.
+    //    an invalid lock is dropped and the hero holds. Once within attack range
+    //    the hero STOPS at the range edge (does not overrun onto the enemy).
     for (final e in _entities) {
       if (e.kind != EntityKind.hero || e.respawnTimer != 0) continue;
       if (e.attackTargetId == -1) continue;
@@ -145,8 +146,10 @@ class Simulation {
       if (tgt == null || !_isAttackable(e, tgt)) {
         e.attackTargetId = -1;
         e.target = e.pos; // hold position
+      } else if ((tgt.pos - e.pos).lengthSq() <= kHeroAttackRangeSq) {
+        e.target = e.pos; // in range: stop here and fire (combat fires this tick too)
       } else {
-        e.target = tgt.pos; // pursue the locked target
+        e.target = tgt.pos; // out of range: close the distance
       }
     }
 

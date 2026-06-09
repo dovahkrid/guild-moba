@@ -350,4 +350,27 @@ void main() {
     }
     expect(sim.entity(1).pos.x.raw, kHero1SpawnX.raw); // stood at spawn, not at the old target
   });
+
+  test('a locked hero stops at attack range instead of overrunning onto the enemy', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    // Off-lane at y=7 so no tower fires (towers at y=0, range 4). Hero 1 stays put
+    // (no intent → holds), hero 0 locks + pursues it from 5 units away.
+    sim.entity(0).pos = FVec2(Fixed.zero, Fixed.fromInt(7));
+    sim.entity(0).target = sim.entity(0).pos;
+    sim.entity(1).pos = FVec2(Fixed.fromInt(5), Fixed.fromInt(7));
+    sim.entity(1).target = sim.entity(1).pos;
+    sim.step(0, const [Intent(playerSlot: 0, type: IntentType.attack, aimX: 1, seq: 1)]);
+    for (var t = 1; t < 120; t++) {
+      sim.step(t, const []);
+    }
+    final dsq = (sim.entity(1).pos - sim.entity(0).pos).lengthSq().toDouble();
+    final rangeSq = kHeroAttackRangeSq.toDouble(); // 9.0 (range 3)
+    // The hero halts the first tick it is within range, so the resting dsq is
+    // always <= rangeSq; the small slack is just Q16.16 rounding headroom.
+    expect(dsq, lessThanOrEqualTo(rangeSq + 0.01), reason: 'must end within attack range');
+    // Any value in (0, rangeSq) catches the regression; old code overran to dsq≈0.
+    // ~7 sits well above the real resting dsq (≈8.4) yet far from 0.
+    expect(dsq, greaterThan(7.0), reason: 'must stop at the range edge, not overrun to point-blank');
+    expect(sim.entity(1).hp.toDouble(), lessThan(kHeroMaxHp.toDouble()), reason: 'fired while stopped');
+  });
 }
