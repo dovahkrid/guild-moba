@@ -3,13 +3,14 @@ import 'package:sim/sim.dart';
 
 /// Per-slot input frontier. Dedupes by seq, tracks the ack frontier reported in
 /// snapshots, and yields each tick's intents: a HELD move/attack (last-writer-
-/// wins, persistent — heroes keep seeking) plus a ONE-SHOT ability that fires the
-/// tick it is drained and is then cleared (an ability is an edge-triggered action,
-/// not a held state — a held ability would auto-recast every cooldown). PURE.
+/// wins, persistent — heroes keep seeking) plus a ONE-SHOT ability/ult that fires
+/// the tick it is drained and is then cleared (one-shots are edge-triggered
+/// actions, not held state — a held ability/ult would auto-recast every cooldown).
+/// PURE.
 class IntentBuffer {
   final List<int> lastAckedSeq = [0, 0];
   final List<Intent?> _held = [null, null]; // persistent move/attack
-  final List<Intent?> _pendingAbility = [null, null]; // one-shot, cleared on drain
+  final List<Intent?> _pendingAbility = [null, null]; // one-shot ability/ult, cleared on drain
 
   /// Accept an inbound input. Returns false if stale/duplicate/out-of-range.
   bool accept(InputMsg msg) {
@@ -26,8 +27,8 @@ class IntentBuffer {
       seq: msg.seq,
       clientTick: msg.clientTick,
     );
-    if (intent.type == IntentType.ability) {
-      _pendingAbility[slot] = intent; // one-shot
+    if (intent.type.isOneShot) {
+      _pendingAbility[slot] = intent; // one-shot ability/ult
     } else {
       _held[slot] = intent; // move/attack: persistent, last-writer-wins
     }

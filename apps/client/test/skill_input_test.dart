@@ -58,4 +58,25 @@ void main() {
     expect(s.onLeftClick(), SkillAction.none); // idle again -> no stray cast
     expect(s.aimPending, isFalse);
   });
+
+  test('Q (ult slot) aim-places, then a left-click casts at the point', () {
+    final s = SkillInputController();
+    expect(s.onSkillKey(downed: false, placesAtSelf: false, slot: SkillSlot.ult), SkillAction.enterAim);
+    expect(s.armedSlot, SkillSlot.ult);
+    expect(s.onLeftClick(), SkillAction.castAtPoint);
+    expect(s.armedSlot, isNull);
+  });
+
+  test('Q self-place casts immediately, no aim', () {
+    final s = SkillInputController();
+    expect(s.onSkillKey(downed: false, placesAtSelf: true, slot: SkillSlot.ult), SkillAction.castAtSelf);
+    expect(s.aimPending, isFalse);
+  });
+
+  test('pressing any skill key while aiming cancels (E armed, Q pressed)', () {
+    final s = SkillInputController();
+    s.onSkillKey(downed: false, placesAtSelf: false, slot: SkillSlot.ability);
+    expect(s.onSkillKey(downed: false, placesAtSelf: false, slot: SkillSlot.ult), SkillAction.cancel);
+    expect(s.aimPending, isFalse);
+  });
 }

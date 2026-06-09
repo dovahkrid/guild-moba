@@ -77,6 +77,17 @@ class MatchBinding {
     _transport.send(ProtocolCodec.encode(input));
   }
 
+  /// Local input: ULT cast at a world point (Q16.16 raw), from a Q-cast
+  /// (self-placed at the hero) or a left-click aim-confirm. Predict + send.
+  void submitUltimate(int aimXRaw, int aimYRaw) {
+    if (_ended) return;
+    final c = _controller;
+    if (c == null) return;
+    final input = c.applyUltimateInput(aimXRaw, aimYRaw);
+    if (input == null) return; // Plan 6: dead hero -> nothing to send
+    _transport.send(ProtocolCodec.encode(input));
+  }
+
   /// Reactions that fired since the last frame (host spawns pop-text once/frame).
   List<RenderReaction> drainReactions() => _controller?.drainReactions() ?? const [];
 

@@ -167,24 +167,33 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks, Keyb
     if (amount > _shake) _shake = amount.clamp(0.0, 1.0);
   }
 
-  /// E = cast the hero's skill. Self-placed skills (Cinderfang) fire at once;
-  /// aim-placed skills (Marisol) arm aim mode, then a left-click places them.
+  /// E = cast the ability, Q = cast the ult. Self-placed skills (Cinderfang)
+  /// fire at once; aim-placed skills (Marisol) arm aim mode, then a left-click
+  /// places them (the reticle follows the cursor — see update()).
   @override
   KeyEventResult onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
-    if (event is! KeyDownEvent || event.logicalKey != LogicalKeyboardKey.keyE) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final SkillSlot slot;
+    if (event.logicalKey == LogicalKeyboardKey.keyE) {
+      slot = SkillSlot.ability;
+    } else if (event.logicalKey == LogicalKeyboardKey.keyQ) {
+      slot = SkillSlot.ult;
+    } else {
       return KeyEventResult.ignored;
     }
     final v = binding.view;
     if (v != null) {
       final downed = _downed.contains(v.localSlot);
-      final action = _skill.onSkillKey(downed: downed, placesAtSelf: heroPlacesAtSelf(v.localSlot));
+      final action = _skill.onSkillKey(
+          downed: downed, placesAtSelf: heroPlacesAtSelf(v.localSlot), slot: slot);
       if (action == SkillAction.castAtSelf) {
-        // Self-placed: the sim ignores the aim point (uses the hero's own
-        // position), but we pass it for clarity.
-        binding.submitAbility(worldToRaw(v.local.x), worldToRaw(v.local.y));
+        final rx = worldToRaw(v.local.x), ry = worldToRaw(v.local.y);
+        if (slot == SkillSlot.ult) {
+          binding.submitUltimate(rx, ry);
+        } else {
+          binding.submitAbility(rx, ry);
+        }
       }
-      // enterAim / cancel / none: state already updated in the controller; no
-      // reticle this pass (spec §3.3 fallback).
     }
     return KeyEventResult.handled;
   }
@@ -209,14 +218,20 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks, Keyb
     binding.submitMoveTo(worldToRaw(wx), worldToRaw(wy));
   }
 
-  /// Left-click = aim-confirm. Only casts when a skill is pending (armed by E);
+  /// Left-click = aim-confirm. Only casts when a skill is armed (by E/Q);
   /// otherwise does nothing.
   @override
   void onTapUp(TapUpEvent event) {
+    final slot = _skill.armedSlot; // capture before onLeftClick consumes it
     if (_skill.onLeftClick() != SkillAction.castAtPoint) return;
     final worldPos = camera.globalToLocal(event.canvasPosition);
-    binding.submitAbility(
-        worldToRaw(flameToWorld(worldPos.x)), worldToRaw(flameToWorld(worldPos.y)));
+    final rx = worldToRaw(flameToWorld(worldPos.x));
+    final ry = worldToRaw(flameToWorld(worldPos.y));
+    if (slot == SkillSlot.ult) {
+      binding.submitUltimate(rx, ry);
+    } else {
+      binding.submitAbility(rx, ry);
+    }
   }
 
   /// Nearest valid enemy entity within a small click radius (world units), else null.

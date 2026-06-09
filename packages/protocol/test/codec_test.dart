@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:protocol/protocol.dart';
+import 'package:sim/sim.dart' show IntentType;
 import 'package:test/test.dart';
 
 void main() {
@@ -49,6 +50,14 @@ void main() {
   test('MatchEndMsg winnerSlot defaults to -1', () {
     final m = roundTrip(const MatchEndMsg(reason: EndReason.opponentLeft));
     expect(m.winnerSlot, -1);
+  });
+
+  test('InputMsg round-trips an ultimate intent type', () {
+    final m = InputMsg(slot: 0, seq: 1, clientTick: 0, aimX: 5, aimY: 6, type: IntentType.ultimate.index);
+    final back = ProtocolCodec.decode(ProtocolCodec.encode(m)) as InputMsg;
+    expect(back.type, IntentType.ultimate.index);
+    expect(back.aimX, 5);
+    expect(back.aimY, 6);
   });
 
   test('decode throws on a text frame', () {

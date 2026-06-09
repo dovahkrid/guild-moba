@@ -104,32 +104,55 @@ class MatchController {
         type: IntentType.ability.index);
   }
 
+  /// Record + apply a local ULT cast at world point (aimX,aimY) (Q16.16 raw);
+  /// returns the InputMsg to send. One-shot like the ability. Returns null (and
+  /// records nothing) while the local hero is downed (Plan 6).
+  InputMsg? applyUltimateInput(int aimX, int aimY) {
+    if (_predicted.entity(localSlot).isDowned) return null; // Plan 6: dead -> ignore
+    final seq = ++_localSeq;
+    final intent = Intent(
+        playerSlot: localSlot,
+        type: IntentType.ultimate,
+        aimX: aimX,
+        aimY: aimY,
+        seq: seq,
+        clientTick: _nextTick);
+    _pending.add(_Pending(_nextTick, intent));
+    return InputMsg(
+        slot: localSlot,
+        seq: seq,
+        clientTick: _nextTick,
+        aimX: aimX,
+        aimY: aimY,
+        type: IntentType.ultimate.index);
+  }
+
   /// Plan 6: once the local hero is downed, drop any HELD (move/attack) order from
   /// the pending log so a stale order cannot re-feed after respawn. (The server
   /// cancels the held order unconditionally on death; an order the client issued
   /// in the death-latency window is dropped server-side WITHOUT an ack, so it would
-  /// otherwise sit in `_pending` forever.) Abilities are one-shot — they only fire
+  /// otherwise sit in `_pending` forever.) One-shot ability/ult intents only fire
   /// on their issuing clientTick, never re-feed — so they are left intact.
   /// Reconcile-safe: the reconcile re-step window is always far newer than a
   /// 150-tick-old death, so these pruned pre-death orders are never re-stepped.
   void _dropHeldWhileLocalDowned() {
     if (_predicted.entity(localSlot).isDowned) {
-      _pending.removeWhere((p) => p.intent.type != IntentType.ability);
+      _pending.removeWhere((p) => !p.intent.type.isOneShot);
     }
   }
 
   /// The local intents to apply at client tick [t]: the held move/attack (latest
-  /// pending with clientTick <= t, last-writer-wins) PLUS any one-shot ability
-  /// whose clientTick == t. Abilities are edge-triggered (fire once on their
+  /// pending with clientTick <= t, last-writer-wins) PLUS any one-shot ability/ult
+  /// whose clientTick == t. One-shots are edge-triggered (fire once on their
   /// issuing tick); move/attack persist. Used in BOTH forward prediction and
   /// reconcile re-steps so prediction matches the server (which one-shots the
-  /// ability too). _pending is ordered by clientTick → the break is safe.
+  /// ability/ult too). _pending is ordered by clientTick → the break is safe.
   List<Intent> _intentsAt(int t) {
     Intent? held;
     final out = <Intent>[];
     for (final p in _pending) {
       if (p.clientTick > t) break;
-      if (p.intent.type == IntentType.ability) {
+      if (p.intent.type.isOneShot) {
         if (p.clientTick == t) out.add(p.intent); // one-shot: only on its issuing tick
       } else {
         held = p.intent; // latest move/attack persists

@@ -14,7 +14,7 @@ class _InFlight<T> {
 /// one-way latency and deterministic loss. Drives a real server Simulation
 /// against a real MatchController. dtMs=33 matches InterpolationBuffer.dtMs.
 ///
-/// MAINTENANCE: the intent-accept logic (held move/attack vs one-shot ability,
+/// MAINTENANCE: the intent-accept logic (held move/attack vs one-shot ability/ult,
 /// seq-dedupe, downed-slot drop) and the HeroDowned clearSlot below MANUALLY
 /// replicate the real server — apps/server/lib/src/loop/match.dart
 /// (Match.addPlayer + _tick) and intent_buffer.dart (IntentBuffer.accept /
@@ -35,10 +35,12 @@ class FakeTransport {
   final List<_InFlight<InputMsg>> _toServer = [];
   final List<_InFlight<SnapshotMsg>> _toClient = [];
   // Mirror the real server IntentBuffer: per-slot HELD move/attack (persistent,
-  // last-writer-wins) + per-slot ONE-SHOT ability (drained once). Nullable: a
-  // slot may have received no input yet.
+  // last-writer-wins) + per-slot ONE-SHOT ability/ult (drained once). Nullable:
+  // a slot may have received no input yet. Note: pressing E and Q in the SAME
+  // 33ms tick keeps only the latter — an accepted placeholder limitation that
+  // reconcile self-corrects.
   final List<Intent?> _held = [null, null];
-  final List<Intent?> _pendingAbility = [null, null];
+  final List<Intent?> _pendingAbility = [null, null]; // latest one-shot (ability or ult) per slot
   final List<int> _ackedSeq = [0, 0];
 
   /// The exact merged authoritative intents the server stepped at each tick,
@@ -96,7 +98,7 @@ class FakeTransport {
 
     // Deliver due client->server inputs. Mirrors Match.addPlayer (drop input for
     // a downed slot, NOT acked) + IntentBuffer.accept (seq-dedupe; split held
-    // move/attack vs one-shot ability).
+    // move/attack vs one-shot ability/ult).
     _toServer.removeWhere((f) {
       if (f.deliverAtMs > _nowMs) return false;
       final m = f.payload;
@@ -112,8 +114,8 @@ class FakeTransport {
             aimY: m.aimY,
             seq: m.seq,
             clientTick: m.clientTick);
-        if (intent.type == IntentType.ability) {
-          _pendingAbility[m.slot] = intent; // one-shot
+        if (intent.type.isOneShot) {
+          _pendingAbility[m.slot] = intent; // one-shot ability/ult
         } else {
           _held[m.slot] = intent; // move/attack: persistent
         }
@@ -137,7 +139,7 @@ class FakeTransport {
       }
       final tick = _serverNextTick;
       final events = server.step(tick, intents);
-      // Mirror Match._tick: death cancels the slot's held order (+ pending ability).
+      // Mirror Match._tick: death cancels the slot's held order (+ pending ability/ult).
       for (final e in events) {
         if (e is HeroDowned) {
           _held[e.heroId] = null;

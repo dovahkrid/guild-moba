@@ -125,6 +125,7 @@ void main() {
     expect(c.applyLocalInput(655360, 0), isNull); // move gated
     expect(c.applyAttackInput(1), isNull); // attack gated
     expect(c.applyAbilityInput(0, 0), isNull); // ability gated
+    expect(c.applyUltimateInput(0, 0), isNull); // ult gated
     expect(c.pendingCount, 0); // nothing recorded
   });
 
@@ -184,6 +185,15 @@ void main() {
     }
     // The trapped order must have been dropped on downing -> hero stands at spawn.
     expect(c.debugLocalPos().x.raw, kHero0SpawnX.raw);
+  });
+
+  test('applyUltimateInput emits an ultimate InputMsg carrying the aim point', () {
+    final c = _ctrl(slot: 1);
+    final msg = c.applyUltimateInput(196608, 458752)!;
+    expect(msg.type, IntentType.ultimate.index);
+    expect(msg.slot, 1);
+    expect(msg.aimX, 196608);
+    expect(msg.aimY, 458752);
   });
 
   test('reconcile reproduces a SINGLE cast (no re-fire): exact hash match', () {
