@@ -28,6 +28,7 @@ extension SimulationCombat on Simulation {
     for (final e in _entities) {
       if (e.attackCooldown > 0) e.attackCooldown -= 1;
       if (e.abilityCooldown > 0) e.abilityCooldown -= 1;
+      if (e.ultCooldown > 0) e.ultCooldown -= 1;
       if (e.reactionIcd > 0) e.reactionIcd -= 1;
       if (e.statusTimer > 0) e.statusTimer -= 1;
     }

@@ -19,12 +19,12 @@ part 'simulation_spawning.dart';
 part 'simulation_serialization.dart';
 
 /// Version of the canonicalBytes() determinism format (the replay-golden hash).
-const int kSchemaVersion = 3;
+const int kSchemaVersion = 4;
 
 /// Version of the snapshotBytes() netcode format (superset incl. Entity.target).
 /// Independent from kSchemaVersion so the determinism golden never moves when
 /// the wire format evolves.
-const int kSnapshotVersion = 3;
+const int kSnapshotVersion = 4;
 
 /// Stable entity id for the wanderer NPC (created in [Simulation.create]).
 const int kWandererEntityId = 2;
@@ -133,6 +133,21 @@ class Simulation {
         hero.abilityCooldown = kAbilityCooldownTicks;
         // Plan 5: a one-time ENEMY-ONLY burst centered on the field (own-team safe).
         _castBurst(hero, center, heroElement(hero.id), events);
+      } else if (it.type == IntentType.ultimate) {
+        if (hero.ultCooldown != 0) continue; // on cooldown → ignore
+        _fields.removeWhere((f) => f.ownerId == hero.id); // ult shares the ≤1-field/hero slot
+        final center = heroPlacesAtSelf(hero.id)
+            ? hero.pos // Cinderfang: at his feet
+            : FVec2(Fixed.raw(it.aimX), Fixed.raw(it.aimY)); // Marisol: at aim
+        _fields.add(ElementalField(
+            ownerId: hero.id,
+            center: center,
+            element: heroElement(hero.id),
+            timer: kUltFieldDurationTicks));
+        hero.ultCooldown = kUltCooldownTicks;
+        // Bigger, enemy-only burst (own-team safe; may amplify a coated enemy).
+        _castBurst(hero, center, heroElement(hero.id), events,
+            radiusSq: kUltRadiusSq, damage: kUltBurstDamage);
       }
     }
 

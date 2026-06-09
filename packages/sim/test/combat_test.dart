@@ -373,4 +373,48 @@ void main() {
     expect(dsq, greaterThan(7.0), reason: 'must stop at the range edge, not overrun to point-blank');
     expect(sim.entity(1).hp.toDouble(), lessThan(kHeroMaxHp.toDouble()), reason: 'fired while stopped');
   });
+
+  test('isOneShot is true for ability + ultimate only', () {
+    expect(IntentType.ability.isOneShot, isTrue);
+    expect(IntentType.ultimate.isOneShot, isTrue);
+    expect(IntentType.move.isOneShot, isFalse);
+    expect(IntentType.attack.isOneShot, isFalse);
+    expect(IntentType.none.isOneShot, isFalse);
+  });
+
+  test('ultimate places a field + sets its own cooldown (independent of ability)', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    sim.step(0, const [Intent(playerSlot: 1, type: IntentType.ultimate, aimX: 0, aimY: 458752, seq: 1)]);
+    expect(sim.fields.where((f) => f.ownerId == 1).length, 1);
+    expect(sim.entity(1).ultCooldown, kUltCooldownTicks - 1); // set in phase 1, ticked once in combat
+    expect(sim.entity(1).abilityCooldown, 0); // E still ready — independent cooldown
+  });
+
+  test('ultimate is gated by its own cooldown (immediate re-cast ignored)', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    sim.step(0, const [Intent(playerSlot: 1, type: IntentType.ultimate, aimX: 0, aimY: 458752, seq: 1)]);
+    final centerAfterFirst = sim.fields.firstWhere((f) => f.ownerId == 1).center.x.raw;
+    sim.step(1, const [Intent(playerSlot: 1, type: IntentType.ultimate, aimX: 131072, aimY: 458752, seq: 2)]);
+    expect(sim.fields.where((f) => f.ownerId == 1).length, 1);
+    expect(sim.fields.firstWhere((f) => f.ownerId == 1).center.x.raw, centerAfterFirst); // not replaced
+  });
+
+  test('ultimate burst is enemy-only (caster takes no self-damage)', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    final selfHp = sim.entity(0).hp.raw;
+    sim.step(0, const [Intent(playerSlot: 0, type: IntentType.ultimate, aimX: 0, aimY: 0, seq: 1)]);
+    expect(sim.entity(0).hp.raw, selfHp);
+  });
+
+  test('ultimate replaces the hero existing ability field (<=1 field per hero)', () {
+    final sim = Simulation.create(const SimConfig(seed: 1));
+    // Marisol drops her E field at (0,7), then ults at a different point (2,7).
+    sim.step(0, const [Intent(playerSlot: 1, type: IntentType.ability, aimX: 0, aimY: 458752, seq: 1)]);
+    expect(sim.fields.where((f) => f.ownerId == 1).length, 1);
+    final eFieldX = sim.fields.firstWhere((f) => f.ownerId == 1).center.x.raw;
+    sim.step(1, const [Intent(playerSlot: 1, type: IntentType.ultimate, aimX: 131072, aimY: 458752, seq: 2)]);
+    final owned = sim.fields.where((f) => f.ownerId == 1).toList();
+    expect(owned.length, 1); // still <=1 — the ult replaced the E field
+    expect(owned.first.center.x.raw, isNot(eFieldX)); // it's the ult field, at the new point (131072 vs 0)
+  });
 }

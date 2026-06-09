@@ -56,6 +56,6 @@ void main() {
     for (var t = 0; t < 300; t++) {
       s.step(t, [m0, m1]);
     }
-    expect(s.canonicalStateHash(), 0x0fbfb7ac);
+    expect(s.canonicalStateHash(), 0xbedf4a43);
   });
 }

@@ -51,7 +51,7 @@ void main() {
   });
 
   test('canonicalBytes/hash unchanged (golden untouched)', () {
-    expect(_run(300).canonicalStateHash(), 0x0fbfb7ac);
+    expect(_run(300).canonicalStateHash(), 0xbedf4a43);
   });
 
   test('snapshot round-trips combat fields (gold, cooldown, respawn, maxHp, winnerTeam)', () {
@@ -85,5 +85,13 @@ void main() {
     expect(dst.entity(0).reactionIcd, 7);
     expect(dst.entity(0).abilityCooldown, 33);
     expect(dst.canonicalStateHash(), src.canonicalStateHash());
+  });
+
+  test('ultCooldown survives a snapshot round-trip', () {
+    final a = Simulation.create(const SimConfig(seed: 1));
+    a.entity(0).ultCooldown = 123;
+    final b = Simulation.create(const SimConfig(seed: 1));
+    b.restoreFromSnapshot(a.snapshotBytes());
+    expect(b.entity(0).ultCooldown, 123);
   });
 }

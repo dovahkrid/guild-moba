@@ -61,7 +61,7 @@ final _EntityFieldCodec _posCodec =
 /// The per-Entity body, in EXACT wire order. Must match the pre-DRY layout
 /// byte-for-byte (pos, vel, hp, maxHp, attackCooldown, gold, respawnTimer,
 /// attackTargetId, statusElement, statusTimer, reactionIcd, abilityCooldown,
-/// target[snapshot-only]).
+/// ultCooldown, target[snapshot-only]).
 final List<_EntityFieldCodec> _entityBodyCodecs = List.unmodifiable([
   _posCodec,
   _fvecCodec((e) => e.vel, (e, v) => e.vel = v),
@@ -75,13 +75,14 @@ final List<_EntityFieldCodec> _entityBodyCodecs = List.unmodifiable([
   _i32Codec((e) => e.statusTimer, (e, v) => e.statusTimer = v),
   _i32Codec((e) => e.reactionIcd, (e, v) => e.reactionIcd = v),
   _i32Codec((e) => e.abilityCooldown, (e, v) => e.abilityCooldown = v),
+  _i32Codec((e) => e.ultCooldown, (e, v) => e.ultCooldown = v),
   _fvecCodec((e) => e.target, (e, v) => e.target = v, snapshotOnly: true),
 ]);
 
 /// Binary serialization for [Simulation] (canonical determinism format +
 /// netcode wire/restore format), split out of simulation.dart (cleaning phase).
 /// Same library → retains private access; zero behavior change. Emitted bytes are
-/// IDENTICAL to before (proven by the replay goldens + the 0x0fbfb7ac anchor).
+/// IDENTICAL to before (proven by the replay goldens + the 0xbedf4a43 anchor).
 extension SimulationSerialization on Simulation {
   void _writeHeader(ByteWriter w, int version) {
     w.i32(version);

@@ -56,15 +56,18 @@ extension SimulationElemental on Simulation {
   /// applies the caster's element AND triggers an attack-amplify Vaporize
   /// (×kVaporizeMult) on an already-differently-coated enemy. Own-team is excluded
   /// → self-safe. Iterates entityIdsSorted for determinism.
-  void _castBurst(Entity caster, FVec2 center, int element, List<SimEvent> events) {
+  void _castBurst(Entity caster, FVec2 center, int element, List<SimEvent> events,
+      {Fixed? radiusSq, Fixed? damage}) {
+    final rSq = radiusSq ?? kFieldRadiusSq;
+    final dmg = damage ?? kCastBurstDamage;
     for (final id in entityIdsSorted) {
       final u = _byId[id]!;
       if (u.kind != EntityKind.hero && u.kind != EntityKind.creep) continue;
       if (u.hp.raw <= 0) continue;
       if (u.kind == EntityKind.hero && u.respawnTimer != 0) continue; // downed
       if (u.teamId == caster.teamId) continue; // ENEMY-ONLY (own-team safe)
-      if ((u.pos - center).lengthSq() > kFieldRadiusSq) continue;
-      _applyHit(caster, u, kCastBurstDamage, element, events);
+      if ((u.pos - center).lengthSq() > rSq) continue;
+      _applyHit(caster, u, dmg, element, events);
     }
   }
 }

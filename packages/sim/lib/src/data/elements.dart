@@ -27,6 +27,16 @@ final Fixed kCastBurstDamage = Fixed.fromNum(16); // one-time enemy-only AoE on 
 // dealt only to an ENEMY of the field owner (owner/own-team take 0).
 final Fixed kReactionFlatDamage = Fixed.fromNum(12); // flat field-overlap reaction (playtest-tuned 2026-06-08, was 8)
 
+// --- Plan 7 part 1: placeholder ultimate (Q) — "E, but bigger, on a long CD" ---
+// Reuses the field + cast-burst machinery with ult-tier numbers; D replaces this
+// content. Constants are NOT serialized → golden-neutral by themselves (only the
+// new Entity.ultCooldown field + the version header move the goldens).
+const int kUltCooldownTicks = 900; // ~30s, independent of the ability cooldown
+final Fixed kUltBurstDamage = Fixed.fromNum(30); // > kCastBurstDamage; ×kVaporizeMult=39 stays < 32768
+final Fixed kUltRadius = Fixed.fromNum(4); // world-units (> kFieldRadius 2.5)
+final Fixed kUltRadiusSq = Fixed.fromNum(4 * 4); // compare vs lengthSq, no sqrt
+const int kUltFieldDurationTicks = 180; // ~6s (> kFieldDurationTicks 120)
+
 // --- Slice roster (data) ---
 // hero 0 = Cinderfang (Pyro, Ember Field placed at his own position);
 // hero 1 = Marisol    (Hydro, Tidepool placed at the aim point).

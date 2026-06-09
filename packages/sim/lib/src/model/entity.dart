@@ -48,6 +48,10 @@ class Entity {
   /// Ticks until this hero's field ability is ready (0 = ready).
   int abilityCooldown;
 
+  /// Ticks until this hero's ULT (Q) is ready (0 = ready). Independent of
+  /// [abilityCooldown]. Serialized (Plan 7 part 1; the v3→v4 byte-layout change).
+  int ultCooldown;
+
   // Heroes seek toward this point (set by a move intent / pursue resolution).
   FVec2 target;
 
@@ -66,6 +70,7 @@ class Entity {
     this.statusTimer = 0,
     this.reactionIcd = 0,
     this.abilityCooldown = 0,
+    this.ultCooldown = 0,
     FVec2? vel,
     FVec2? target,
   })  : maxHp = maxHp ?? hp,
