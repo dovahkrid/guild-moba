@@ -128,6 +128,8 @@ LoL-style: **E = ability** (existing field), **Q = ultimate** (new). The placeho
 - Any **protocol** byte-layout/version change; any cooldown/HUD UI for the ult (pressing Q on cooldown simply sends an intent the sim ignores — no client cooldown prediction).
 - Speculative serialized fields for D (no XP/level fields now — D owns its own v4→v5 bump if it needs them).
 
+**Known limitation (accepted for the placeholder; → D backlog):** the server `IntentBuffer` and `FakeTransport` hold **one one-shot intent per slot per tick**, so pressing **E and Q within the same ~33 ms tick** keeps only the latter authoritatively, while the client predicts both fire — a transient predicted-vs-authoritative divergence that **reconcile self-heals** (both seqs are acked → both pending entries prune → the next snapshot re-anchors). Acceptable here (ults are a placeholder, casts on the same tick are a rare human input); when D adds real ults, the per-slot one-shot store likely needs to become **per-intent-type** (E vs Q) so simultaneous casts both land.
+
 ---
 
 ## 5. Tests & verification (evidence-first)
