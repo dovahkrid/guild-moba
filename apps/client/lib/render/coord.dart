@@ -23,3 +23,9 @@ double flameToWorld(double f) => f / kPixelsPerUnit;
 /// in world units, scaled to screen). Reads the constant so it tracks any
 /// future range change. At range 4 this is 4 * 28 = 112 px.
 double towerRangeRingRadiusPx() => kTowerAttackRange.toDouble() * kPixelsPerUnit;
+
+/// Pixel radius of the ability (E) field aim reticle — `kFieldRadius` scaled.
+double fieldRingRadiusPx() => kFieldRadius.toDouble() * kPixelsPerUnit;
+
+/// Pixel radius of the ult (Q) aim reticle — `kUltRadius` scaled.
+double ultRingRadiusPx() => kUltRadius.toDouble() * kPixelsPerUnit;

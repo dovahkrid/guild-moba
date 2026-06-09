@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui'; // Color for the FX tints (flame/components does not re-export it)
 
 import 'package:flame/components.dart';
-import 'package:flame/events.dart'; // KeyboardEvents mixin (also re-exported here)
+import 'package:flame/events.dart'; // KeyboardEvents + PointerMoveCallbacks mixins (also re-exported here)
 import 'package:flame/game.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey, KeyEvent, KeyDownEvent;
 import 'package:flutter/widgets.dart' show KeyEventResult;
@@ -13,6 +13,7 @@ import 'package:sim/sim.dart' show EntityKind, heroElement, heroPlacesAtSelf;
 import '../match/match_binding.dart';
 import '../match/skill_input.dart';
 import 'coord.dart';
+import 'dashed_circle.dart';
 import 'entity_view.dart';
 import 'field_view.dart';
 import 'fx/attack_streak.dart';
@@ -22,9 +23,14 @@ import 'reaction_label.dart';
 import 'sprites/sprite_catalog.dart';
 import 'world_backdrop.dart';
 
+/// Debug/tuning aid (Plan 7 part 1): draw a dashed reticle at the cursor while a
+/// skill is armed. Flip to false to remove it.
+const bool kShowAimReticle = true;
+
 /// The Flame game. Renders MatchView's entity list as colored shapes; holds ZERO
 /// gameplay truth. Spawns/despawns EntityViews via an id-keyed diff each frame.
-class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks, KeyboardEvents {
+class GuildGame extends FlameGame
+    with SecondaryTapCallbacks, TapCallbacks, KeyboardEvents, PointerMoveCallbacks {
   GuildGame(this.binding);
 
   final MatchBinding binding;
@@ -33,6 +39,8 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks, Keyb
   final SpriteCatalog _catalog = SpriteCatalog();
   final Set<int> _downed = {};
   final SkillInputController _skill = SkillInputController();
+  Vector2? _cursorFlame; // latest cursor position in world/flame space
+  DashedCircle? _reticle;
   double _shake = 0; // 0..1
   double _shakeT = 0;
 
@@ -91,6 +99,23 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks, Keyb
     }
     // The local hero went down mid-aim: drop any pending aim (can't cast downed).
     if (_downed.contains(v.localSlot) && _skill.aimPending) _skill.clearAim();
+
+    // Aim reticle: a dashed circle at the cursor while a skill is armed, sized
+    // to the pending cast (field for E, larger for the ult).
+    final showReticle = kShowAimReticle && _skill.aimPending && _cursorFlame != null;
+    if (showReticle) {
+      final r = _skill.armedSlot == SkillSlot.ult ? ultRingRadiusPx() : fieldRingRadiusPx();
+      if (_reticle == null) {
+        _reticle = DashedCircle(radius: r, color: const Color(0x66FFFFFF));
+        world.add(_reticle!);
+      } else {
+        _reticle!.radius = r;
+      }
+      _reticle!.position.setFrom(_cursorFlame!);
+    } else if (_reticle != null) {
+      _reticle!.removeFromParent();
+      _reticle = null;
+    }
 
     // Diff field zones (keyed by ownerId).
     final seenFields = <int>{};
@@ -196,6 +221,11 @@ class GuildGame extends FlameGame with SecondaryTapCallbacks, TapCallbacks, Keyb
       }
     }
     return KeyEventResult.handled;
+  }
+
+  @override
+  void onPointerMove(PointerMoveEvent event) {
+    _cursorFlame = camera.globalToLocal(event.canvasPosition);
   }
 
   /// LoL right-click semantics: right-clicking ON an enemy locks an attack onto

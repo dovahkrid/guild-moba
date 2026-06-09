@@ -17,4 +17,10 @@ void main() {
     expect(c.radius, 112.0);
     expect(c.dashCount, greaterThan(0));
   });
+
+  test('aim ring radii read the sim field + ult constants', () {
+    expect(fieldRingRadiusPx(), kFieldRadius.toDouble() * kPixelsPerUnit);
+    expect(ultRingRadiusPx(), kUltRadius.toDouble() * kPixelsPerUnit);
+    expect(ultRingRadiusPx(), greaterThan(fieldRingRadiusPx())); // ult is bigger
+  });
 }
